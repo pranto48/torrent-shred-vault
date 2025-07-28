@@ -14,7 +14,81 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      bucket_licenses: {
+        Row: {
+          bucket_size_gb: number
+          created_at: string
+          encryption_method: string | null
+          expires_at: string | null
+          id: string
+          is_active: boolean
+          license_key: string
+          max_buckets: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          bucket_size_gb?: number
+          created_at?: string
+          encryption_method?: string | null
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          license_key: string
+          max_buckets?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          bucket_size_gb?: number
+          created_at?: string
+          encryption_method?: string | null
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          license_key?: string
+          max_buckets?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          bio: string | null
+          created_at: string
+          display_name: string | null
+          email: string | null
+          id: string
+          updated_at: string
+          user_id: string
+          username: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string
+          display_name?: string | null
+          email?: string | null
+          id?: string
+          updated_at?: string
+          user_id: string
+          username?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string
+          display_name?: string | null
+          email?: string | null
+          id?: string
+          updated_at?: string
+          user_id?: string
+          username?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
