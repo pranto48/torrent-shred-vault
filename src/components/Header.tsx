@@ -34,11 +34,11 @@ const Header = () => {
 
           {/* Auth Buttons */}
           <div className="flex items-center space-x-4">
-            <Button variant="ghost" className="hidden sm:inline-flex">
-              Sign In
+            <Button variant="ghost" className="hidden sm:inline-flex" asChild>
+              <a href="/auth">Sign In</a>
             </Button>
-            <Button variant="glow">
-              Get Started
+            <Button variant="glow" asChild>
+              <a href="/auth">Get Started</a>
             </Button>
             <Button variant="ghost" size="icon" className="md:hidden">
               <Menu className="w-5 h-5" />
