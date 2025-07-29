@@ -7,8 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
-import { User, Session } from "@supabase/supabase-js";
-import { Shield, LogOut, Key, HardDrive, Users, Settings, Copy, Plus, Trash2 } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { Shield, LogOut, Key, HardDrive, Users, Settings, Copy, Plus, Trash2, UserCog } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
@@ -46,8 +46,7 @@ interface BucketLicenseFormData {
 const Dashboard = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
+  const { user, isAdmin, loading: authLoading } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [bucketLicenses, setBucketLicenses] = useState<BucketLicense[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,30 +57,12 @@ const Dashboard = () => {
   const bucketForm = useForm<BucketLicenseFormData>();
 
   useEffect(() => {
-    // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (!session) {
-        navigate("/auth");
-      }
-    });
-
-    // Check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (!session) {
-        navigate("/auth");
-      } else {
-        fetchUserData();
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [navigate]);
+    if (!authLoading && !user) {
+      navigate("/auth");
+    } else if (user) {
+      fetchUserData();
+    }
+  }, [user, authLoading, navigate]);
 
   const fetchUserData = async () => {
     try {
@@ -270,10 +251,22 @@ const Dashboard = () => {
                 EncryptStore Dashboard
               </h1>
             </div>
-            <Button variant="ghost" onClick={handleSignOut}>
-              <LogOut className="w-4 h-4 mr-2" />
-              Sign Out
-            </Button>
+            <div className="flex items-center gap-3">
+              {isAdmin && (
+                <Button 
+                  variant="outline" 
+                  onClick={() => navigate('/admin')}
+                  className="flex items-center gap-2"
+                >
+                  <UserCog className="w-4 h-4" />
+                  Admin Panel
+                </Button>
+              )}
+              <Button variant="ghost" onClick={handleSignOut}>
+                <LogOut className="w-4 h-4 mr-2" />
+                Sign Out
+              </Button>
+            </div>
           </div>
         </div>
       </header>
