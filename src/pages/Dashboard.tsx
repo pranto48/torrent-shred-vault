@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Shield, LogOut, Key, HardDrive, Users, Settings, Copy, Plus, Trash2, UserCog } from "lucide-react";
+import { FileManager } from "@/components/FileManager";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
@@ -273,6 +274,11 @@ const Dashboard = () => {
 
       <div className="container mx-auto px-6 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* File Manager Section - Full Width */}
+          <div className="lg:col-span-3">
+            <FileManager bucketLicenses={bucketLicenses} userId={user.id} />
+          </div>
+          
           {/* Profile Section */}
           <div className="lg:col-span-1">
             <Card>

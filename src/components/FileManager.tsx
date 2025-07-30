@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Upload, Download, File, Folder, Trash2, Key, Server, Sync } from "lucide-react";
+import { Upload, Download, File, Folder, Trash2, Key, Server, RefreshCw } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 interface FileItem {
@@ -231,7 +231,7 @@ export const FileManager = ({ bucketLicenses, userId }: FileManagerProps) => {
               Download Config
             </Button>
             <Button variant="outline">
-              <Sync className="w-4 h-4 mr-2" />
+              <RefreshCw className="w-4 h-4 mr-2" />
               Test Connection
             </Button>
           </div>
