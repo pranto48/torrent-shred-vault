@@ -69,33 +69,30 @@ const Dashboard = () => {
     try {
       setLoading(true);
       
-      // Fetch profile
-      const { data: profileData, error: profileError } = await supabase
-        .from("profiles")
-        .select("*")
-        .single();
+      // Fetch both profile and bucket licenses in parallel
+      const [profileResult, bucketResult] = await Promise.allSettled([
+        supabase.from("profiles").select("*").single(),
+        supabase.from("bucket_licenses").select("*").order("created_at", { ascending: false })
+      ]);
 
-      if (profileError) {
-        console.error("Error fetching profile:", profileError);
-      } else {
+      // Handle profile data
+      if (profileResult.status === 'fulfilled' && !profileResult.value.error) {
+        const profileData = profileResult.value.data;
         setProfile(profileData);
         profileForm.reset({
           username: profileData.username || "",
           display_name: profileData.display_name || "",
           bio: profileData.bio || "",
         });
+      } else {
+        console.error("Error fetching profile:", profileResult.status === 'fulfilled' ? profileResult.value.error : profileResult.reason);
       }
 
-      // Fetch bucket licenses
-      const { data: bucketData, error: bucketError } = await supabase
-        .from("bucket_licenses")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (bucketError) {
-        console.error("Error fetching bucket licenses:", bucketError);
+      // Handle bucket licenses data
+      if (bucketResult.status === 'fulfilled' && !bucketResult.value.error) {
+        setBucketLicenses(bucketResult.value.data);
       } else {
-        setBucketLicenses(bucketData);
+        console.error("Error fetching bucket licenses:", bucketResult.status === 'fulfilled' ? bucketResult.value.error : bucketResult.reason);
       }
     } catch (error) {
       console.error("Error fetching user data:", error);

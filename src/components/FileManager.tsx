@@ -85,7 +85,7 @@ export const FileManager = ({ bucketLicenses, userId }: FileManagerProps) => {
 
       if (error) throw error;
 
-      const fileItems: FileItem[] = data.map(item => ({
+      const fileItems: FileItem[] = data?.map(item => ({
         id: item.id || item.name,
         name: item.name,
         size: item.metadata?.size || 0,
@@ -94,7 +94,7 @@ export const FileManager = ({ bucketLicenses, userId }: FileManagerProps) => {
         bucket_id: selectedBucket,
         created_at: item.created_at || new Date().toISOString(),
         download_url: item.metadata?.download_url
-      }));
+      })) || [];
 
       setFiles(fileItems);
     } catch (error: any) {
