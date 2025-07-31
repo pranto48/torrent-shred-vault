@@ -36,7 +36,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const checkAdminStatus = async (userId: string) => {
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('user_roles')
         .select('role, is_active')
         .eq('user_id', userId)
@@ -44,8 +44,16 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         .eq('is_active', true)
         .single();
       
+      // If table doesn't exist or query fails, default to non-admin
+      if (error) {
+        console.log('Admin check failed (table may not exist):', error);
+        setIsAdmin(false);
+        return;
+      }
+      
       setIsAdmin(!!data);
     } catch (error) {
+      console.log('Admin check error:', error);
       setIsAdmin(false);
     }
   };
