@@ -58,10 +58,12 @@ const Dashboard = () => {
   const bucketForm = useForm<BucketLicenseFormData>();
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      navigate("/auth");
-    } else if (user) {
-      fetchUserData();
+    if (!authLoading) {
+      if (!user) {
+        navigate("/auth");
+      } else {
+        fetchUserData();
+      }
     }
   }, [user, authLoading, navigate]);
 
@@ -220,7 +222,18 @@ const Dashboard = () => {
     }
   };
 
-  if (authLoading || loading) {
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <Shield className="w-12 h-12 mx-auto text-primary animate-pulse mb-4" />
+          <p>Authenticating...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading && user) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
