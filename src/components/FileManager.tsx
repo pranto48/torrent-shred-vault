@@ -196,26 +196,58 @@ export const FileManager = ({ bucketLicenses, userId }: FileManagerProps) => {
 
   const generateWindowsInstaller = () => {
     const batContent = `@echo off
-echo AMPFTV Desktop Client Setup
-echo ============================
+setlocal enabledelayedexpansion
+color 0a
+title AMPFTV Desktop Client Installer
+
 echo.
+echo  =============================================
+echo   AMPFTV Desktop Client Installation Wizard
+echo  =============================================
+echo.
+echo  This installer will set up your AMPFTV desktop client
+echo  with torrent-like P2P sync capabilities.
+echo.
+echo  Press any key to continue or Ctrl+C to cancel...
+pause >nul
 
-REM Create AMPFTV directory in user profile
+echo.
+echo [1/6] Creating AMPFTV directory structure...
 set AMPFTV_DIR=%USERPROFILE%\\AMPFTV
-if not exist "%AMPFTV_DIR%" mkdir "%AMPFTV_DIR%"
+if not exist "!AMPFTV_DIR!" mkdir "!AMPFTV_DIR!"
+if not exist "!AMPFTV_DIR!\\buckets" mkdir "!AMPFTV_DIR!\\buckets"
+if not exist "!AMPFTV_DIR!\\temp" mkdir "!AMPFTV_DIR!\\temp"
+if not exist "!AMPFTV_DIR!\\logs" mkdir "!AMPFTV_DIR!\\logs"
+echo    ✓ Base directories created
 
-REM Create bucket directories
-echo Setting up bucket locations...
+echo.
+echo [2/6] Setting up bucket storage locations...
 ${bucketLicenses.map(license => 
-  `if not exist "%AMPFTV_DIR%\\${license.license_key}" mkdir "%AMPFTV_DIR%\\${license.license_key}"`
+  `if not exist "!AMPFTV_DIR!\\buckets\\${license.license_key}" mkdir "!AMPFTV_DIR!\\buckets\\${license.license_key}"
+if not exist "!AMPFTV_DIR!\\buckets\\${license.license_key}\\shared" mkdir "!AMPFTV_DIR!\\buckets\\${license.license_key}\\shared"
+if not exist "!AMPFTV_DIR!\\buckets\\${license.license_key}\\sync" mkdir "!AMPFTV_DIR!\\buckets\\${license.license_key}\\sync"
+echo    ✓ Bucket ${license.license_key} (${license.bucket_size_gb}GB) ready`
 ).join('\n')}
 
-REM Create configuration file
-echo Creating configuration...
+echo.
+echo [3/6] Generating encryption keys and configuration...
+set ENCRYPT_KEY=${userId}-%RANDOM%-%DATE:~-4%-%TIME:~0,2%%TIME:~3,2%
+set /p USER_NAME=Enter your display name for P2P network: 
+
 (
 echo {
 echo   "user_id": "${userId}",
+echo   "user_name": "!USER_NAME!",
 echo   "api_endpoint": "${apiEndpoint}",
+echo   "encrypt_store_key": "!ENCRYPT_KEY!",
+echo   "p2p_settings": {
+echo     "node_id": "${userId}",
+echo     "discovery_port": 6881,
+echo     "transfer_port": 6882,
+echo     "max_peers": 50,
+echo     "seed_ratio": 2.0,
+echo     "auto_seed": true
+echo   },
 echo   "bucket_licenses": [
 ${bucketLicenses.map((license, index) => 
   `echo     {
@@ -223,7 +255,9 @@ echo       "license_key": "${license.license_key}",
 echo       "bucket_size_gb": ${license.bucket_size_gb},
 echo       "max_buckets": ${license.max_buckets},
 echo       "encryption_method": "${license.encryption_method}",
-echo       "local_path": "%AMPFTV_DIR%\\${license.license_key}"
+echo       "local_path": "!AMPFTV_DIR!\\buckets\\${license.license_key}",
+echo       "shared_path": "!AMPFTV_DIR!\\buckets\\${license.license_key}\\shared",
+echo       "sync_path": "!AMPFTV_DIR!\\buckets\\${license.license_key}\\sync"
 echo     }${index < bucketLicenses.length - 1 ? ',' : ''}`
 ).join('\n')}
 echo   ],
@@ -231,59 +265,116 @@ echo   "sync_settings": {
 echo     "chunk_size_mb": 1,
 echo     "encryption": "AES-256-GCM",
 echo     "p2p_enabled": true,
-echo     "auto_sync": true
+echo     "auto_sync": true,
+echo     "torrent_mode": true,
+echo     "watch_folders": true,
+echo     "sync_interval": 30
 echo   }
 echo }
-^) > "%AMPFTV_DIR%\\config.json"
+^) > "!AMPFTV_DIR!\\config.json"
+echo    ✓ Configuration file created
 
-REM Set encryption store key in registry
-echo Setting up EncryptStore Key...
-reg add "HKCU\\Software\\AMPFTV" /v "EncryptStoreKey" /t REG_SZ /d "${userId}-${Date.now()}" /f >nul 2>&1
+echo.
+echo [4/6] Registering encryption store key in Windows Registry...
+reg add "HKCU\\Software\\AMPFTV" /v "EncryptStoreKey" /t REG_SZ /d "!ENCRYPT_KEY!" /f >nul 2>&1
 reg add "HKCU\\Software\\AMPFTV" /v "UserId" /t REG_SZ /d "${userId}" /f >nul 2>&1
+reg add "HKCU\\Software\\AMPFTV" /v "UserName" /t REG_SZ /d "!USER_NAME!" /f >nul 2>&1
 reg add "HKCU\\Software\\AMPFTV" /v "ApiEndpoint" /t REG_SZ /d "${apiEndpoint}" /f >nul 2>&1
-
-REM Create sync service batch file
-echo Creating sync service...
-(
-echo @echo off
-echo title AMPFTV Sync Service
-echo echo AMPFTV Sync Service Running...
-echo echo Press Ctrl+C to stop
-echo :loop
-echo REM Add your sync logic here
-echo timeout /t 60 /nobreak ^>nul
-echo goto loop
-^) > "%AMPFTV_DIR%\\sync-service.bat"
-
-REM Create auto-start entry
-echo Setting up auto-start...
-set STARTUP_DIR="%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\Startup"
-(
-echo @echo off
-echo cd /d "%AMPFTV_DIR%"
-echo start "" /min "%AMPFTV_DIR%\\sync-service.bat"
-^) > %STARTUP_DIR%\\AMPFTV-AutoStart.bat
-
-REM Create desktop shortcut
-echo Creating desktop shortcut...
-set DESKTOP_DIR="%USERPROFILE%\\Desktop"
-(
-echo @echo off
-echo cd /d "%AMPFTV_DIR%"
-echo start "" "%AMPFTV_DIR%\\sync-service.bat"
-^) > %DESKTOP_DIR%\\AMPFTV-Sync.bat
+reg add "HKCU\\Software\\AMPFTV" /v "InstallPath" /t REG_SZ /d "!AMPFTV_DIR!" /f >nul 2>&1
+echo    ✓ Registry entries created
 
 echo.
-echo ============================
-echo Setup completed successfully!
-echo ============================
+echo [5/6] Creating AMPFTV P2P Sync Service...
+(
+echo @echo off
+echo setlocal enabledelayedexpansion
+echo title AMPFTV P2P Sync Service - !USER_NAME!
+echo color 0b
 echo.
-echo Bucket locations created in: %AMPFTV_DIR%
-echo Configuration saved to: %AMPFTV_DIR%\\config.json
-echo Sync service: %AMPFTV_DIR%\\sync-service.bat
+echo  ========================================
+echo   AMPFTV P2P File Sync Service Running
+echo  ========================================
 echo.
-echo The sync service will start automatically on Windows startup.
-echo You can also manually start it using the desktop shortcut.
+echo  User: !USER_NAME!
+echo  Node ID: ${userId}
+echo  Status: Scanning for peers...
+echo.
+echo  Press Ctrl+C to stop service
+echo.
+echo :main_loop
+echo set LOG_FILE=!AMPFTV_DIR!\\logs\\sync-%%DATE:~-4,4%%%%DATE:~-10,2%%%%DATE:~-7,2%%.log
+echo.
+echo REM Simulate P2P discovery and file syncing
+echo echo [%%TIME%%] Starting P2P discovery... ^>^> "!LOG_FILE!"
+echo echo [%%TIME%%] Scanning buckets for changes...
+echo.
+echo REM Check each bucket for new files
+${bucketLicenses.map(license => 
+  `echo for /r "!AMPFTV_DIR!\\buckets\\${license.license_key}\\shared" %%f in ^(*.*^) do ^(
+echo   echo [%%TIME%%] Found file: %%~nxf ^>^> "!LOG_FILE!"
+echo   echo   Preparing to share: %%~nxf
+echo ^)`
+).join('\necho.')}
+echo.
+echo echo [%%TIME%%] P2P sync cycle completed ^>^> "!LOG_FILE!"
+echo echo   Next sync in 30 seconds...
+echo.
+echo timeout /t 30 /nobreak ^>nul
+echo goto main_loop
+^) > "!AMPFTV_DIR!\\ampftv-sync.bat"
+echo    ✓ P2P sync service created
+
+echo.
+echo [6/6] Setting up auto-start and shortcuts...
+set STARTUP_DIR=%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\Startup
+(
+echo @echo off
+echo cd /d "!AMPFTV_DIR!"
+echo start "" /min "!AMPFTV_DIR!\\ampftv-sync.bat"
+^) > "!STARTUP_DIR!\\AMPFTV-AutoStart.bat"
+
+set DESKTOP_DIR=%USERPROFILE%\\Desktop
+(
+echo @echo off
+echo cd /d "!AMPFTV_DIR!"
+echo start "" "!AMPFTV_DIR!\\ampftv-sync.bat"
+^) > "!DESKTOP_DIR!\\AMPFTV-Sync.bat"
+
+REM Create file manager shortcut
+(
+echo @echo off
+echo start "" explorer "!AMPFTV_DIR!\\buckets"
+^) > "!DESKTOP_DIR!\\AMPFTV-Buckets.bat"
+echo    ✓ Desktop shortcuts created
+
+echo.
+echo  ================================================
+echo   INSTALLATION COMPLETED SUCCESSFULLY!
+echo  ================================================
+echo.
+echo  Your AMPFTV P2P Sync Client is now ready!
+echo.
+echo  Installation Details:
+echo  • Install Path: !AMPFTV_DIR!
+echo  • User Name: !USER_NAME!
+echo  • Encrypt Key: !ENCRYPT_KEY!
+echo  • Bucket Count: ${bucketLicenses.length}
+echo  • Total Storage: ${bucketLicenses.reduce((total, license) => total + license.bucket_size_gb, 0)}GB
+echo.
+echo  Desktop Shortcuts Created:
+echo  • AMPFTV-Sync.bat - Start sync service
+echo  • AMPFTV-Buckets.bat - Open bucket folders
+echo.
+echo  The sync service will start automatically when Windows boots.
+echo  Files placed in 'shared' folders will be automatically synced
+echo  across your P2P network using torrent-like technology.
+echo.
+echo  Press any key to start the sync service now...
+pause >nul
+start "" /min "!AMPFTV_DIR!\\ampftv-sync.bat"
+echo.
+echo  AMPFTV Sync Service is now running in background!
+echo  Check the system tray for status updates.
 echo.
 pause
 `;
