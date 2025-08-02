@@ -195,13 +195,16 @@ export const FileManager = ({ bucketLicenses, userId }: FileManagerProps) => {
   };
 
   const generateWindowsInstaller = () => {
-    // Build the bucket directory creation commands
-    const bucketCommands = bucketLicenses.map(license => 
-      `if not exist "!AMPFTV_DIR!\\\\buckets\\\\${license.license_key}" mkdir "!AMPFTV_DIR!\\\\buckets\\\\${license.license_key}"
+    // Build the bucket directory creation commands with progress
+    const bucketCommands = bucketLicenses.map((license, index) => 
+      `echo [Bucket ${index + 1}/${bucketLicenses.length}] Setting up ${license.license_key}...
+if not exist "!AMPFTV_DIR!\\\\buckets\\\\${license.license_key}" mkdir "!AMPFTV_DIR!\\\\buckets\\\\${license.license_key}"
 if not exist "!AMPFTV_DIR!\\\\buckets\\\\${license.license_key}\\\\shared" mkdir "!AMPFTV_DIR!\\\\buckets\\\\${license.license_key}\\\\shared"
 if not exist "!AMPFTV_DIR!\\\\buckets\\\\${license.license_key}\\\\sync" mkdir "!AMPFTV_DIR!\\\\buckets\\\\${license.license_key}\\\\sync"
 if not exist "!AMPFTV_DIR!\\\\buckets\\\\${license.license_key}\\\\downloads" mkdir "!AMPFTV_DIR!\\\\buckets\\\\${license.license_key}\\\\downloads"
-echo    ✓ Bucket ${license.license_key} (${license.bucket_size_gb}GB) ready`
+echo Path: !AMPFTV_DIR!\\\\buckets\\\\${license.license_key}
+echo    ✓ Bucket ${license.license_key} (${license.bucket_size_gb}GB) ready
+echo.`
     ).join('\n');
 
     // Build the bucket config JSON lines
@@ -274,9 +277,15 @@ echo    ✓ Dependencies installed
 
 echo.
 echo [5/8] Generating encryption keys and configuration...
+echo    █████████████████████████████████████████████████ 62%%
 set ENCRYPT_KEY=${userId}-%RANDOM%-%DATE:~-4%-%TIME:~0,2%%TIME:~3,2%
+echo    Encryption key generated: !ENCRYPT_KEY!
+echo.
 set /p USER_NAME=Enter your display name for P2P network: 
 if "!USER_NAME!"=="" set USER_NAME=AMPFTV-User
+echo    P2P Display Name: !USER_NAME!
+echo    Node ID: ${userId}
+echo    ████████████████████████████████████████████████████ 75%%
 
 (
 echo {
@@ -317,18 +326,26 @@ echo }
 echo    ✓ Configuration file created
 
 echo.
-echo [6/8] Creating P2P torrent service...
-echo Creating Node.js service file...
+echo [6/8] Creating advanced P2P torrent service...
+echo    ██████████████████████████████████████████████████████ 87%%
+echo    Creating enhanced Node.js service with real-time monitoring...
 (
 echo const WebTorrent = require^('webtorrent'^);
 echo const fs = require^('fs'^);
 echo const path = require^('path'^);
 echo const chokidar = require^('chokidar'^);
 echo const express = require^('express'^);
+echo const WebSocket = require^('ws'^);
 echo.
 echo const config = JSON.parse^(fs.readFileSync^('./config.json', 'utf8'^)^);
 echo const client = new WebTorrent^(^);
 echo const app = express^(^);
+echo.
+echo // Real-time activity tracking
+echo let activityLog = [];
+echo let connectedPeers = [];
+echo let uploadStats = { totalBytes: 0, currentSpeed: 0 };
+echo let downloadStats = { totalBytes: 0, currentSpeed: 0 };
 echo.
 echo console.log^('==========================================='^);
 echo console.log^('  AMPFTV P2P Client Starting...'^);
@@ -339,88 +356,300 @@ echo console.log^('Buckets:', config.bucket_licenses.length^);
 echo console.log^('Web UI Port:', config.p2p_settings.web_ui_port^);
 echo console.log^('==========================================='^);
 echo.
-echo // Simple Web UI
+echo // Enhanced Web UI with real-time activity
 echo app.get^('/', ^(req, res^) =^> {
 echo   const html = \`
 echo   ^<html^>
-echo   ^<head^>^<title^>AMPFTV P2P Client^</title^>^</head^>
-echo   ^<body style="font-family: Arial, sans-serif; margin: 20px;"^>
-echo     ^<h1^>AMPFTV P2P File Sharing Client^</h1^>
-echo     ^<h2 style="color: green;"^>Status: Running^</h2^>
-echo     ^<p^>^<strong^>User:^</strong^> \$^{config.user_name^}^</p^>
-echo     ^<p^>^<strong^>Active Torrents:^</strong^> \$^{client.torrents.length^}^</p^>
-echo     ^<p^>^<strong^>Files Shared:^</strong^> \$^{client.torrents.reduce^(^(total, t^) =^> total + t.files.length, 0^)^}^</p^>
-echo     ^<h3^>Buckets:^</h3^>
-echo     ^<ul^>
-echo       \$^{config.bucket_licenses.map^(b =^> \`^<li^>\$^{b.license_key^} - \$^{b.bucket_size_gb^}GB^</li^>\`^).join^(''^)^}
-echo     ^</ul^>
-echo     ^<h3^>How to Use:^</h3^>
-echo     ^<ol^>
-echo       ^<li^>Put files in 'shared' folders to automatically seed them^</li^>
-echo       ^<li^>Copy .magnet files to 'torrents' folder to download^</li^>
-echo       ^<li^>Downloaded files appear in 'downloads' folder^</li^>
-echo     ^</ol^>
+echo   ^<head^>
+echo     ^<title^>AMPFTV P2P Client - Real-time Dashboard^</title^>
+echo     ^<meta charset="utf-8"^>
+echo     ^<meta name="viewport" content="width=device-width, initial-scale=1"^>
+echo     ^<style^>
+echo       body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 0; background: #f5f5f5; }
+echo       .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+echo       .header { background: linear-gradient^(135deg, #667eea 0%%, #764ba2 100%%^); color: white; padding: 30px; border-radius: 10px; margin-bottom: 20px; text-align: center; }
+echo       .status-grid { display: grid; grid-template-columns: repeat^(auto-fit, minmax^(250px, 1fr^)^); gap: 20px; margin-bottom: 20px; }
+echo       .stat-card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba^(0,0,0,0.1^); }
+echo       .stat-value { font-size: 2em; font-weight: bold; color: #667eea; }
+echo       .stat-label { color: #666; margin-top: 5px; }
+echo       .progress-bar { width: 100%%; height: 20px; background: #e0e0e0; border-radius: 10px; overflow: hidden; margin: 10px 0; }
+echo       .progress-fill { height: 100%%; background: linear-gradient^(90deg, #4CAF50, #8BC34A^); transition: width 0.3s; }
+echo       .activity-log { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba^(0,0,0,0.1^); max-height: 400px; overflow-y: auto; }
+echo       .activity-item { padding: 10px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; }
+echo       .activity-item:last-child { border-bottom: none; }
+echo       .bucket-list { display: grid; grid-template-columns: repeat^(auto-fill, minmax^(300px, 1fr^)^); gap: 15px; margin: 20px 0; }
+echo       .bucket-card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba^(0,0,0,0.1^); }
+echo       .status-online { color: #4CAF50; font-weight: bold; }
+echo       .peer-count { background: #667eea; color: white; padding: 5px 10px; border-radius: 15px; font-size: 0.8em; }
+echo     ^</style^>
+echo   ^</head^>
+echo   ^<body^>
+echo     ^<div class="container"^>
+echo       ^<div class="header"^>
+echo         ^<h1^>🌐 AMPFTV P2P Client Dashboard^</h1^>
+echo         ^<p^>Real-time P2P File Sharing Network^</p^>
+echo         ^<p^>User: \$^{config.user_name^} | Node: \$^{config.user_id.substring^(0,8^)^}...^</p^>
+echo       ^</div^>
+echo       
+echo       ^<div class="status-grid"^>
+echo         ^<div class="stat-card"^>
+echo           ^<div class="stat-value" id="torrent-count"^>\$^{client.torrents.length^}^</div^>
+echo           ^<div class="stat-label"^>Active Torrents^</div^>
+echo         ^</div^>
+echo         ^<div class="stat-card"^>
+echo           ^<div class="stat-value" id="peer-count"^>\$^{client.torrents.reduce^(^(total, t^) =^> total + t.numPeers, 0^)^}^</div^>
+echo           ^<div class="stat-label"^>Connected Peers^</div^>
+echo         ^</div^>
+echo         ^<div class="stat-card"^>
+echo           ^<div class="stat-value" id="download-speed"^>0^</div^>
+echo           ^<div class="stat-label"^>Download Speed ^(KB/s^)^</div^>
+echo         ^</div^>
+echo         ^<div class="stat-card"^>
+echo           ^<div class="stat-value" id="upload-speed"^>0^</div^>
+echo           ^<div class="stat-label"^>Upload Speed ^(KB/s^)^</div^>
+echo         ^</div^>
+echo       ^</div^>
+echo       
+echo       ^<div class="bucket-list"^>
+echo         \$^{config.bucket_licenses.map^(b =^> \`
+echo           ^<div class="bucket-card"^>
+echo             ^<h3^>📁 \$^{b.license_key^}^</h3^>
+echo             ^<p^>Storage: \$^{b.bucket_size_gb^}GB^</p^>
+echo             ^<p^>Path: \$^{b.shared_path^}^</p^>
+echo             ^<span class="status-online"^>● Active^</span^>
+echo           ^</div^>
+echo         \`^).join^(''^)^}
+echo       ^</div^>
+echo       
+echo       ^<div class="activity-log"^>
+echo         ^<h3^>📊 Real-time Activity^</h3^>
+echo         ^<div id="activity-feed"^>
+echo           ^<div class="activity-item"^>
+echo             ^<span^>Service started successfully^</span^>
+echo             ^<span^>\$^{new Date^(^).toLocaleTimeString^(^)^}^</span^>
+echo           ^</div^>
+echo         ^</div^>
+echo       ^</div^>
+echo       
+echo       ^<script^>
+echo         // Real-time updates via WebSocket
+echo         const ws = new WebSocket^('ws://localhost:8081'^);
+echo         ws.onmessage = function^(event^) {
+echo           const data = JSON.parse^(event.data^);
+echo           if ^(data.type === 'stats'^) {
+echo             document.getElementById^('torrent-count'^).textContent = data.torrents;
+echo             document.getElementById^('peer-count'^).textContent = data.peers;
+echo             document.getElementById^('download-speed'^).textContent = data.downloadSpeed;
+echo             document.getElementById^('upload-speed'^).textContent = data.uploadSpeed;
+echo           } else if ^(data.type === 'activity'^) {
+echo             const feed = document.getElementById^('activity-feed'^);
+echo             const item = document.createElement^('div'^);
+echo             item.className = 'activity-item';
+echo             item.innerHTML = \`^<span^>\$^{data.message^}^</span^>^<span^>\$^{new Date^(^).toLocaleTimeString^(^)^}^</span^>\`;
+echo             feed.insertBefore^(item, feed.firstChild^);
+echo             if ^(feed.children.length ^> 50^) feed.removeChild^(feed.lastChild^);
+echo           }
+echo         };
+echo       ^</script^>
+echo     ^</div^>
 echo   ^</body^>
 echo   ^</html^>
 echo   \`;
 echo   res.send^(html^);
 echo }^);
 echo.
-echo const server = app.listen^(config.p2p_settings.web_ui_port, ^(^) =^> {
-echo   console.log^(\`Web UI running at http://localhost:\$^{config.p2p_settings.web_ui_port^}\`^);
+echo // API endpoints for bucket management
+echo app.get^('/api/buckets', ^(req, res^) =^> {
+echo   res.json^(config.bucket_licenses.map^(b =^> ^(^{
+echo     ...b,
+echo     files: fs.existsSync^(b.shared_path^) ? fs.readdirSync^(b.shared_path^) : []
+echo   }^)^)^);
 echo }^);
 echo.
-echo // File watcher for auto-seeding
-echo config.bucket_licenses.forEach^(bucket =^> {
+echo app.get^('/api/stats', ^(req, res^) =^> {
+echo   res.json^(^{
+echo     torrents: client.torrents.length,
+echo     peers: client.torrents.reduce^(^(total, t^) =^> total + t.numPeers, 0^),
+echo     downloadSpeed: Math.round^(client.downloadSpeed / 1024^),
+echo     uploadSpeed: Math.round^(client.uploadSpeed / 1024^),
+echo     progress: client.progress
+echo   }^);
+echo }^);
+echo.
+echo // WebSocket server for real-time updates
+echo const WebSocket = require^('ws'^);
+echo const wss = new WebSocket.Server^({ port: 8081 }^);
+echo.
+echo const server = app.listen^(config.p2p_settings.web_ui_port, ^(^) =^> {
+echo   console.log^(\`✓ Web UI running at http://localhost:\$^{config.p2p_settings.web_ui_port^}\`^);
+echo   console.log^(\`✓ WebSocket server running on port 8081\`^);
+echo   console.log^(\`✓ Real-time dashboard active\`^);
+echo }^);
+echo.
+echo // Broadcast stats every 2 seconds
+echo setInterval^(^(^) =^> {
+echo   const stats = {
+echo     type: 'stats',
+echo     torrents: client.torrents.length,
+echo     peers: client.torrents.reduce^(^(total, t^) =^> total + t.numPeers, 0^),
+echo     downloadSpeed: Math.round^(client.downloadSpeed / 1024^),
+echo     uploadSpeed: Math.round^(client.uploadSpeed / 1024^)
+echo   };
+echo   wss.clients.forEach^(ws =^> {
+echo     if ^(ws.readyState === WebSocket.OPEN^) ws.send^(JSON.stringify^(stats^)^);
+echo   }^);
+echo }, 2000^);
+echo.
+echo // Enhanced file watcher for auto-seeding with progress tracking
+echo config.bucket_licenses.forEach^(^(bucket, bucketIndex^) =^> {
 echo   const sharedPath = bucket.shared_path.replace^(/\\\\\\\\/g, '/'^);
-echo   console.log^(\`Watching for new files: \$^{sharedPath^}\`^);
+echo   console.log^(\`[Bucket \$^{bucketIndex + 1^}/\$^{config.bucket_licenses.length^}] Watching: \$^{sharedPath^}\`^);
 echo   
 echo   if ^(fs.existsSync^(sharedPath^)^) {
 echo     chokidar.watch^(sharedPath^).on^('add', ^(filePath^) =^> {
-echo       console.log^(\`New file detected: \$^{path.basename^(filePath^)^}\`^);
+echo       const fileName = path.basename^(filePath^);
+echo       console.log^(\`📁 New file detected: \$^{fileName^} in \$^{bucket.license_key^}\`^);
+echo       
+echo       // Broadcast activity
+echo       wss.clients.forEach^(ws =^> {
+echo         if ^(ws.readyState === WebSocket.OPEN^) {
+echo           ws.send^(JSON.stringify^(^{
+echo             type: 'activity',
+echo             message: \`📤 Seeding new file: \$^{fileName^} in \$^{bucket.license_key^}\`
+echo           }^)^);
+echo         }
+echo       }^);
 echo       
 echo       client.seed^(filePath, {
-echo         name: path.basename^(filePath^),
+echo         name: fileName,
+echo         comment: \`AMPFTV - \$^{config.user_name^} - \$^{bucket.license_key^}\`,
 echo         announce: config.sync_settings.tracker_servers
 echo       }, ^(torrent^) =^> {
-echo         console.log^(\`Now seeding: \$^{torrent.name^}\`^);
+echo         console.log^(\`🌱 Now seeding: \$^{torrent.name^} - \$^{torrent.infoHash^}\`^);
 echo         
+echo         // Save torrent and magnet files
 echo         const torrentPath = path.join^('./torrents', torrent.name + '.torrent'^);
 echo         fs.writeFileSync^(torrentPath, torrent.torrentFile^);
 echo         
 echo         const magnetPath = path.join^('./torrents', torrent.name + '.magnet'^);
 echo         fs.writeFileSync^(magnetPath, torrent.magnetURI^);
-echo         console.log^(\`Magnet link saved: \$^{magnetPath^}\`^);
+echo         
+echo         // Create detailed info file
+echo         const infoPath = path.join^('./torrents', torrent.name + '.info.json'^);
+echo         fs.writeFileSync^(infoPath, JSON.stringify^(^{
+echo           name: torrent.name,
+echo           infoHash: torrent.infoHash,
+echo           magnetURI: torrent.magnetURI,
+echo           bucket: bucket.license_key,
+echo           user: config.user_name,
+echo           created: new Date^(^).toISOString^(^),
+echo           size: torrent.length,
+echo           files: torrent.files.map^(f =^> f.name^)
+echo         }, null, 2^)^);
+echo         
+echo         console.log^(\`📋 Magnet link saved: \$^{magnetPath^}\`^);
+echo         
+echo         // Track seeding progress
+echo         torrent.on^('upload', ^(^) =^> {
+echo           wss.clients.forEach^(ws =^> {
+echo             if ^(ws.readyState === WebSocket.OPEN^) {
+echo               ws.send^(JSON.stringify^(^{
+echo                 type: 'activity',
+echo                 message: \`⬆️ Uploading \$^{fileName^} - \$^{Math.round^(torrent.uploadSpeed / 1024^)^} KB/s\`
+echo               }^)^);
+echo             }
+echo           }^);
+echo         }^);
 echo       }^);
 echo     }^);
+echo   } else {
+echo     console.log^(\`⚠️ Warning: Bucket path not found: \$^{sharedPath^}\`^);
 echo   }
 echo }^);
 echo.
-echo // Auto-download from magnet files
+echo // Enhanced auto-download from magnet files with progress tracking
 echo setInterval^(^(^) =^> {
 echo   const torrentsDir = './torrents';
 echo   if ^(fs.existsSync^(torrentsDir^)^) {
 echo     fs.readdirSync^(torrentsDir^).forEach^(file =^> {
 echo       if ^(file.endsWith^('.magnet'^) ^&^& !file.startsWith^('downloaded_'^)^) {
 echo         const magnetPath = path.join^(torrentsDir, file^);
-echo         const magnetURI = fs.readFileSync^(magnetPath, 'utf8'^);
+echo         const magnetURI = fs.readFileSync^(magnetPath, 'utf8'^).trim^(^);
 echo         
 echo         if ^(!client.torrents.find^(t =^> t.magnetURI === magnetURI^)^) {
-echo           console.log^(\`Starting download from: \$^{file^}\`^);
+echo           console.log^(\`📥 Starting download from: \$^{file^}\`^);
+echo           
+echo           // Broadcast download start
+echo           wss.clients.forEach^(ws =^> {
+echo             if ^(ws.readyState === WebSocket.OPEN^) {
+echo               ws.send^(JSON.stringify^(^{
+echo                 type: 'activity',
+echo                 message: \`📥 Starting download: \$^{file.replace^('.magnet', ''^)^}\`
+echo               }^)^);
+echo             }
+echo           }^);
 echo           
 echo           client.add^(magnetURI, { path: './downloads' }, ^(torrent^) =^> {
-echo             console.log^(\`Downloading: \$^{torrent.name^}\`^);
+echo             console.log^(\`⬇️ Downloading: \$^{torrent.name^} - \$^{torrent.files.length^} files\`^);
+echo             
+echo             // Track download progress
+echo             let lastProgress = 0;
+echo             const progressInterval = setInterval^(^(^) =^> {
+echo               const progress = Math.round^(torrent.progress * 100^);
+echo               if ^(progress ^> lastProgress ^&^& progress %% 10 === 0^) {
+echo                 lastProgress = progress;
+echo                 console.log^(\`📊 \$^{torrent.name^}: \$^{progress^}%% complete\`^);
+echo                 
+echo                 wss.clients.forEach^(ws =^> {
+echo                   if ^(ws.readyState === WebSocket.OPEN^) {
+echo                     ws.send^(JSON.stringify^(^{
+echo                       type: 'activity',
+echo                       message: \`📊 \$^{torrent.name^}: \$^{progress^}%% - \$^{Math.round^(torrent.downloadSpeed / 1024^)^} KB/s\`
+echo                     }^)^);
+echo                   }
+echo                 }^);
+echo               }
+echo             }, 1000^);
 echo             
 echo             torrent.on^('done', ^(^) =^> {
-echo               console.log^(\`Download completed: \$^{torrent.name^}\`^);
+echo               clearInterval^(progressInterval^);
+echo               console.log^(\`✅ Download completed: \$^{torrent.name^}\`^);
+echo               
+echo               // Broadcast completion
+echo               wss.clients.forEach^(ws =^> {
+echo                 if ^(ws.readyState === WebSocket.OPEN^) {
+echo                   ws.send^(JSON.stringify^(^{
+echo                     type: 'activity',
+echo                     message: \`✅ Download complete: \$^{torrent.name^}\`
+echo                   }^)^);
+echo                 }
+echo               }^);
+echo               
+echo               // Mark magnet as downloaded
 echo               fs.renameSync^(magnetPath, path.join^(torrentsDir, 'downloaded_' + file^)^);
+echo               
+echo               // Create download summary
+echo               const summaryPath = path.join^('./downloads', torrent.name + '_summary.json'^);
+echo               fs.writeFileSync^(summaryPath, JSON.stringify^(^{
+echo                 name: torrent.name,
+echo                 downloadedAt: new Date^(^).toISOString^(^),
+echo                 size: torrent.length,
+echo                 files: torrent.files.map^(f =^> f.name^),
+echo                 peers: torrent.numPeers,
+echo                 magnetURI: torrent.magnetURI
+echo               }, null, 2^)^);
+echo             }^);
+echo             
+echo             torrent.on^('error', ^(err^) =^> {
+echo               console.error^(\`❌ Download error for \$^{torrent.name^}:\`, err.message^);
+echo               clearInterval^(progressInterval^);
 echo             }^);
 echo           }^);
 echo         }
 echo       }
 echo     }^);
 echo   }
-echo }, 10000^);
+echo }, 5000^);
 echo.
 echo console.log^('\\nAMPFTV P2P Client is running!'^);
 echo console.log^('Press Ctrl+C to stop the service'^);
@@ -429,14 +658,22 @@ echo    ✓ P2P service created
 
 echo.
 echo [7/8] Creating startup and control scripts...
+echo    ███████████████████████████████████████████████████████████ 95%%
 (
 echo @echo off
 echo title AMPFTV P2P Service - !USER_NAME!
 echo color 0b
 echo cd /d "!AMPFTV_DIR!"
-echo echo Starting AMPFTV P2P Service...
-echo echo Web UI will be available at: http://localhost:8080
+echo echo ================================
+echo echo   AMPFTV P2P Service Starting
+echo echo ================================
+echo echo User: !USER_NAME!
+echo echo Web UI: http://localhost:8080
+echo echo WebSocket: ws://localhost:8081
+echo echo Buckets: ${bucketLicenses.length} configured
+echo echo ================================
 echo echo.
+echo echo Starting Node.js service...
 echo node ampftv-service.js
 echo pause
 ^) > "!AMPFTV_DIR!\\start-service.bat"
@@ -444,29 +681,46 @@ echo pause
 set DESKTOP_DIR=%USERPROFILE%\\Desktop
 (
 echo @echo off
+echo echo Starting AMPFTV P2P Client...
 echo cd /d "!AMPFTV_DIR!"
 echo start "" "!AMPFTV_DIR!\\start-service.bat"
 ^) > "!DESKTOP_DIR!\\AMPFTV-Start.bat"
 
 (
 echo @echo off
+echo echo Opening AMPFTV Web Dashboard...
+echo timeout /t 3 /nobreak >nul
 echo start "" http://localhost:8080
 ^) > "!DESKTOP_DIR!\\AMPFTV-WebUI.bat"
 
 (
 echo @echo off
+echo echo Opening shared buckets folder...
 echo start "" explorer "!AMPFTV_DIR!\\buckets"
 ^) > "!DESKTOP_DIR!\\AMPFTV-Buckets.bat"
 
 (
 echo @echo off
+echo echo Opening downloads folder...
 echo start "" explorer "!AMPFTV_DIR!\\downloads"
 ^) > "!DESKTOP_DIR!\\AMPFTV-Downloads.bat"
 
 (
 echo @echo off
+echo echo Opening torrents folder...
 echo start "" explorer "!AMPFTV_DIR!\\torrents"
 ^) > "!DESKTOP_DIR!\\AMPFTV-Torrents.bat"
+
+(
+echo @echo off
+echo echo Creating service status check...
+echo cd /d "!AMPFTV_DIR!"
+echo echo Checking AMPFTV P2P Service Status...
+echo echo.
+echo curl -s http://localhost:8080/api/stats ^|^| echo Service not running
+echo echo.
+echo pause
+^) > "!DESKTOP_DIR!\\AMPFTV-Status.bat"
 
 set STARTUP_DIR=%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\Startup
 (
@@ -475,17 +729,24 @@ echo cd /d "!AMPFTV_DIR!"
 echo start "" /min "!AMPFTV_DIR!\\start-service.bat"
 ^) > "!STARTUP_DIR!\\AMPFTV-AutoStart.bat"
 
-echo    ✓ Control scripts created
+echo    ✓ Enhanced control scripts created
+echo    ✓ Desktop shortcuts installed
+echo    ✓ Auto-startup configured
 
 echo.
-echo [8/8] Setting up Windows Registry entries...
+echo [8/8] Setting up Windows Registry and finalizing...
+echo    ████████████████████████████████████████████████████████████ 100%%
 reg add "HKCU\\Software\\AMPFTV" /v "EncryptStoreKey" /t REG_SZ /d "!ENCRYPT_KEY!" /f >nul 2>&1
 reg add "HKCU\\Software\\AMPFTV" /v "UserId" /t REG_SZ /d "${userId}" /f >nul 2>&1
 reg add "HKCU\\Software\\AMPFTV" /v "UserName" /t REG_SZ /d "!USER_NAME!" /f >nul 2>&1
 reg add "HKCU\\Software\\AMPFTV" /v "ApiEndpoint" /t REG_SZ /d "${apiEndpoint}" /f >nul 2>&1
 reg add "HKCU\\Software\\AMPFTV" /v "InstallPath" /t REG_SZ /d "!AMPFTV_DIR!" /f >nul 2>&1
 reg add "HKCU\\Software\\AMPFTV" /v "WebUIPort" /t REG_SZ /d "8080" /f >nul 2>&1
+reg add "HKCU\\Software\\AMPFTV" /v "WebSocketPort" /t REG_SZ /d "8081" /f >nul 2>&1
+reg add "HKCU\\Software\\AMPFTV" /v "Version" /t REG_SZ /d "2.0.0" /f >nul 2>&1
 echo    ✓ Registry entries created
+echo    ✓ Service configuration saved
+echo    ✓ P2P network parameters registered
 
 echo.
 echo  ===================================================
