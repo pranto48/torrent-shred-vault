@@ -1,11 +1,14 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Upload, Download, File, Folder, Trash2, Key, Server, RefreshCw } from "lucide-react";
+import { Upload, Download, File, Folder, Trash2, Key, Server, RefreshCw, Share, RotateCcw, ExternalLink, Copy } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 interface FileItem {
@@ -19,21 +22,35 @@ interface FileItem {
   download_url?: string;
 }
 
+interface SyncFile {
+  bucket_id: string;
+  file_name: string;
+  file_size: number;
+  magnet_link: string;
+  last_modified: string;
+  file_path: string;
+}
+
 interface FileManagerProps {
   bucketLicenses: any[];
   userId: string;
 }
 
 export const FileManager = ({ bucketLicenses, userId }: FileManagerProps) => {
+  const { user } = useAuth();
   const { toast } = useToast();
   const [files, setFiles] = useState<FileItem[]>([]);
+  const [syncFiles, setSyncFiles] = useState<SyncFile[]>([]);
   const [selectedBucket, setSelectedBucket] = useState<string>("");
   const [uploading, setUploading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [syncProgress, setSyncProgress] = useState(0);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [apiEndpoint, setApiEndpoint] = useState("");
 
   useEffect(() => {
     // Set API endpoint for desktop client integration
-    setApiEndpoint(`https://ampftv.itsupport.com.bd/api/v1/sync/${userId}`);
+    setApiEndpoint(`https://xoatoskjxjzoambdijtu.supabase.co/functions/v1/sync/${userId}`);
   }, [userId]);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -192,6 +209,88 @@ export const FileManager = ({ bucketLicenses, userId }: FileManagerProps) => {
       title: "Config downloaded",
       description: "Desktop client configuration file downloaded.",
     });
+  };
+
+  const syncFileData = async () => {
+    if (!user) return;
+    
+    setIsLoading(true);
+    setIsSyncing(true);
+    setSyncProgress(0);
+
+    try {
+      // Simulate sync progress
+      const progressSteps = [20, 40, 60, 80, 100];
+      for (const step of progressSteps) {
+        setSyncProgress(step);
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+
+      // Call sync API
+      const { data, error } = await supabase.functions.invoke('sync', {
+        body: { action: 'sync_request' }
+      });
+
+      if (error) throw error;
+
+      if (data?.files) {
+        setSyncFiles(data.files);
+        toast({
+          title: "Sync completed",
+          description: `Synced ${data.files.length} files successfully!`,
+        });
+      }
+    } catch (error: any) {
+      console.error('Sync error:', error);
+      toast({
+        title: "Sync failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+      setIsSyncing(false);
+    }
+  };
+
+  const loadSyncFiles = async () => {
+    if (!user) return;
+    
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('sync');
+      
+      if (error) throw error;
+      
+      if (data?.files) {
+        setSyncFiles(data.files);
+      }
+    } catch (error: any) {
+      console.error('Load sync files error:', error);
+      toast({
+        title: "Failed to load sync files",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const copyMagnetLink = (magnetLink: string) => {
+    navigator.clipboard.writeText(magnetLink);
+    toast({
+      title: "Magnet link copied",
+      description: "Magnet link copied to clipboard for torrent download.",
+    });
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
   const generateWindowsInstaller = () => {
@@ -805,6 +904,10 @@ pause`;
     }
   }, [selectedBucket]);
 
+  useEffect(() => {
+    loadSyncFiles();
+  }, [user]);
+
   return (
     <div className="space-y-6">
       {/* Desktop Client Integration */}
@@ -955,6 +1058,103 @@ pause`;
               </div>
             </>
           )}
+        </CardContent>
+      </Card>
+
+      {/* P2P Sync Manager */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Share className="w-5 h-5" />
+            P2P File Sync Manager
+          </CardTitle>
+          <CardDescription>
+            Sync files with torrent-like P2P technology and magnet links
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex gap-4 flex-wrap">
+            <Button 
+              onClick={syncFileData} 
+              disabled={isLoading || isSyncing}
+              variant="outline"
+              className="flex items-center gap-2"
+            >
+              <RotateCcw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+              {isSyncing ? 'Syncing...' : 'Sync Files'}
+            </Button>
+
+            <Button asChild variant="outline">
+              <a href="http://localhost:8080" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2">
+                <ExternalLink className="w-4 h-4" />
+                Open Web UI
+              </a>
+            </Button>
+          </div>
+
+          {isSyncing && (
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span>Sync Progress</span>
+                <span>{syncProgress}%</span>
+              </div>
+              <Progress value={syncProgress} />
+            </div>
+          )}
+
+          <div className="text-sm text-muted-foreground">
+            <p><strong>API Sync Endpoint:</strong></p>
+            <code className="bg-muted p-1 rounded text-xs">
+              {apiEndpoint}
+            </code>
+          </div>
+
+          <div className="space-y-3">
+            <h4 className="font-medium">Shared Bucket Files ({syncFiles.length})</h4>
+            {isLoading ? (
+              <div className="text-center py-8">Loading sync files...</div>
+            ) : syncFiles.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No files found for P2P sharing. Upload files to buckets to start sharing!
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {syncFiles.map((file, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h4 className="font-medium">{file.file_name}</h4>
+                        <Badge variant="secondary">{file.bucket_id}</Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {formatFileSize(file.file_size)} • Modified {new Date(file.last_modified).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => copyMagnetLink(file.magnet_link)}
+                        className="flex items-center gap-1"
+                      >
+                        <Copy className="w-3 h-3" />
+                        Copy Magnet
+                      </Button>
+                      <Button asChild size="sm">
+                        <a href={file.magnet_link} className="flex items-center gap-1">
+                          <Download className="w-3 h-3" />
+                          Download
+                        </a>
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
     </div>

@@ -89,6 +89,36 @@ export type Database = {
         }
         Relationships: []
       }
+      sync_logs: {
+        Row: {
+          action: string
+          created_at: string
+          file_hash: string | null
+          file_path: string
+          id: string
+          sync_timestamp: string
+          user_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          file_hash?: string | null
+          file_path: string
+          id?: string
+          sync_timestamp?: string
+          user_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          file_hash?: string | null
+          file_path?: string
+          id?: string
+          sync_timestamp?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
