@@ -89,19 +89,54 @@ serve(async (req) => {
 
     if (req.method === 'POST') {
       // Handle file sync updates
-      const body = await req.json()
+      let body;
+      try {
+        const bodyText = await req.text();
+        if (!bodyText.trim()) {
+          return new Response(
+            JSON.stringify({ error: 'Request body is empty' }),
+            { 
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            }
+          )
+        }
+        body = JSON.parse(bodyText);
+      } catch (parseError) {
+        console.error('JSON parse error:', parseError)
+        return new Response(
+          JSON.stringify({ error: 'Invalid JSON in request body' }),
+          { 
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        )
+      }
+
       const { action, file_path, file_hash } = body
 
-      console.log(`Sync action: ${action} for file: ${file_path}`)
+      console.log(`Sync action: ${action} for file: ${file_path} by user: ${userId}`)
+
+      // Validate userId is a proper UUID
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(userId)) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid user ID format' }),
+          { 
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        )
+      }
 
       // Log sync activity
       const { error: logError } = await supabase
         .from('sync_logs')
         .insert({
           user_id: userId,
-          action,
-          file_path,
-          file_hash,
+          action: action || 'unknown',
+          file_path: file_path || 'unknown',
+          file_hash: file_hash || null,
           sync_timestamp: new Date().toISOString()
         })
 
@@ -112,7 +147,8 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           success: true, 
-          message: `Sync ${action} completed for ${file_path}` 
+          message: `Sync ${action} completed for ${file_path}`,
+          user_id: userId
         }),
         {
           status: 200,
