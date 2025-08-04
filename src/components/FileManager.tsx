@@ -952,7 +952,7 @@ pause`;
             <ul className="text-sm text-muted-foreground space-y-1">
               <li>• Files placed in "shared" folders are automatically seeded to the network</li>
               <li>• Copy magnet links (.magnet files) to "torrents" folder to download</li>
-              <li>• Web UI at localhost:8080 shows real-time activity</li>
+              <li>• Web UI at localhost:8080 will show real-time sync activity (requires desktop client setup)</li>
               <li>• Uses WebTorrent technology for peer-to-peer file sharing</li>
               <li>• Service runs automatically with Windows startup</li>
             </ul>
