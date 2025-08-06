@@ -320,8 +320,17 @@ echo Creating desktop shortcut...
 set DESKTOP=%USERPROFILE%\Desktop
 (
 echo @echo off
+echo echo Starting BucketLynx P2P Client for %BUCKET_NAME%...
+echo echo Sync Path: %SYNC_PATH%
 echo cd /d "%SYNC_PATH%"
-echo start "BucketLynx P2P - %BUCKET_NAME%" cmd /k "node sync-client.js"
+echo if not exist "sync-client.js" (
+echo   echo ERROR: sync-client.js not found in %SYNC_PATH%
+echo   echo Please run the setup script again.
+echo   pause
+echo   exit /b 1
+echo )
+echo node sync-client.js
+echo pause
 ) > "%DESKTOP%\BucketLynx P2P - %BUCKET_NAME%.bat"
 
 echo.
