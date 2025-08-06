@@ -15,15 +15,18 @@ serve(async (req) => {
   try {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
     const url = new URL(req.url)
-    const userId = url.pathname.split('/').pop()
+    const pathParts = url.pathname.split('/')
+    const userId = pathParts[pathParts.length - 1]
 
-    if (!userId) {
+    console.log('Sync request:', { method: req.method, userId, pathname: url.pathname })
+
+    if (!userId || userId === 'sync') {
       return new Response(
-        JSON.stringify({ error: 'User ID required' }),
+        JSON.stringify({ error: 'User ID required in path' }),
         { 
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }

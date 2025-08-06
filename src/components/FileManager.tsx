@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Upload, Download, File, Folder, Trash2, Key, Server, RefreshCw, Share, RotateCcw, ExternalLink, Copy } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
@@ -38,7 +37,6 @@ interface FileManagerProps {
 
 export const FileManager = ({ bucketLicenses, userId }: FileManagerProps) => {
   const { user } = useAuth();
-  const { toast } = useToast();
   const [files, setFiles] = useState<FileItem[]>([]);
   const [syncFiles, setSyncFiles] = useState<SyncFile[]>([]);
   const [selectedBucket, setSelectedBucket] = useState<string>("");
@@ -75,18 +73,11 @@ export const FileManager = ({ bucketLicenses, userId }: FileManagerProps) => {
 
       if (error) throw error;
 
-      toast({
-        title: "File uploaded successfully",
-        description: `${file.name} has been encrypted and uploaded to your bucket.`,
-      });
+      toast.success(`${file.name} has been encrypted and uploaded to your bucket.`);
 
       fetchFiles();
     } catch (error: any) {
-      toast({
-        title: "Upload failed",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast.error(`Upload failed: ${error.message}`);
     } finally {
       setUploading(false);
     }
@@ -135,16 +126,9 @@ export const FileManager = ({ bucketLicenses, userId }: FileManagerProps) => {
       a.click();
       URL.revokeObjectURL(url);
 
-      toast({
-        title: "Download started",
-        description: `${file.name} is being decrypted and downloaded.`,
-      });
+      toast.success(`${file.name} is being decrypted and downloaded.`);
     } catch (error: any) {
-      toast({
-        title: "Download failed",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast.error(`Download failed: ${error.message}`);
     }
   };
 
@@ -156,27 +140,17 @@ export const FileManager = ({ bucketLicenses, userId }: FileManagerProps) => {
 
       if (error) throw error;
 
-      toast({
-        title: "File deleted",
-        description: `${file.name} has been permanently deleted.`,
-      });
+      toast.success(`${file.name} has been permanently deleted.`);
 
       fetchFiles();
     } catch (error: any) {
-      toast({
-        title: "Delete failed",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast.error(`Delete failed: ${error.message}`);
     }
   };
 
   const copyApiEndpoint = () => {
     navigator.clipboard.writeText(apiEndpoint);
-    toast({
-      title: "API Endpoint copied",
-      description: "Desktop client integration URL copied to clipboard.",
-    });
+    toast.success("Desktop client integration URL copied to clipboard.");
   };
 
   const generateDesktopConfig = () => {
@@ -205,10 +179,7 @@ export const FileManager = ({ bucketLicenses, userId }: FileManagerProps) => {
     a.click();
     URL.revokeObjectURL(url);
 
-    toast({
-      title: "Config downloaded",
-      description: "Desktop client configuration file downloaded.",
-    });
+    toast.success("Desktop client configuration file downloaded.");
   };
 
   const syncFileData = async () => {
@@ -235,18 +206,11 @@ export const FileManager = ({ bucketLicenses, userId }: FileManagerProps) => {
 
       if (data?.files) {
         setSyncFiles(data.files);
-        toast({
-          title: "Sync completed",
-          description: `Synced ${data.files.length} files successfully!`,
-        });
+        toast.success(`Synced ${data.files.length} files successfully!`);
       }
     } catch (error: any) {
       console.error('Sync error:', error);
-      toast({
-        title: "Sync failed",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast.error(`Sync failed: ${error.message}`);
     } finally {
       setIsLoading(false);
       setIsSyncing(false);
@@ -267,11 +231,7 @@ export const FileManager = ({ bucketLicenses, userId }: FileManagerProps) => {
       }
     } catch (error: any) {
       console.error('Load sync files error:', error);
-      toast({
-        title: "Failed to load sync files",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast.error(`Failed to load sync files: ${error.message}`);
     } finally {
       setIsLoading(false);
     }
@@ -279,10 +239,7 @@ export const FileManager = ({ bucketLicenses, userId }: FileManagerProps) => {
 
   const copyMagnetLink = (magnetLink: string) => {
     navigator.clipboard.writeText(magnetLink);
-    toast({
-      title: "Magnet link copied",
-      description: "Magnet link copied to clipboard for torrent download.",
-    });
+    toast.success("Magnet link copied to clipboard for torrent download.");
   };
 
   const formatFileSize = (bytes: number) => {
@@ -892,10 +849,7 @@ pause`;
     a.click();
     URL.revokeObjectURL(url);
 
-    toast({
-      title: "Windows installer downloaded",
-      description: "AMPFTV-Setup.bat file downloaded. Run as administrator for full P2P setup with real torrent functionality.",
-    });
+    toast.success("AMPFTV-Setup.bat file downloaded. Run as administrator for full P2P setup with real torrent functionality.");
   };
 
   useEffect(() => {
@@ -934,27 +888,41 @@ pause`;
             </div>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={generateDesktopConfig}>
+            <Button 
+              variant="outline"
+              onClick={() => {
+                const element = document.createElement('a');
+                element.setAttribute('href', '/setup-p2p-client.bat');
+                element.setAttribute('download', 'setup-p2p-client.bat');
+                element.style.display = 'none';
+                document.body.appendChild(element);
+                element.click();
+                document.body.removeChild(element);
+                toast.success('P2P setup file downloaded! Run as Administrator and enter bucket details.');
+              }}
+            >
               <Download className="w-4 h-4 mr-2" />
-              Download Config
+              Download P2P Setup (.bat)
             </Button>
-            <Button variant="outline" onClick={generateWindowsInstaller}>
-              <Download className="w-4 h-4 mr-2" />
-              Windows P2P Installer
-            </Button>
-            <Button variant="outline">
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Test Connection
+            <Button 
+              variant="outline"
+              onClick={() => {
+                window.open('http://localhost:8080', '_blank');
+              }}
+            >
+              <ExternalLink className="w-4 h-4 mr-2" />
+              Open Web UI (localhost:8080)
             </Button>
           </div>
           <div className="p-4 bg-muted rounded-lg">
-            <h4 className="font-medium mb-2">How P2P File Sharing Works:</h4>
+            <h4 className="font-medium mb-2">P2P Setup & Usage:</h4>
             <ul className="text-sm text-muted-foreground space-y-1">
-              <li>• Files placed in "shared" folders are automatically seeded to the network</li>
-              <li>• Copy magnet links (.magnet files) to "torrents" folder to download</li>
-              <li>• Web UI at localhost:8080 will show real-time sync activity (requires desktop client setup)</li>
-              <li>• Uses WebTorrent technology for peer-to-peer file sharing</li>
-              <li>• Service runs automatically with Windows startup</li>
+              <li>• Download the .bat file and run as Administrator</li>
+              <li>• Enter your custom bucket name and sync folder path when prompted</li>
+              <li>• Script auto-installs Node.js dependencies and creates folders</li>
+              <li>• Web UI at localhost:8080 shows real-time sync activity and statistics</li>
+              <li>• Place files in "shared" folder to seed them to the network</li>
+              <li>• Drop .magnet files in "torrents" folder to download files</li>
             </ul>
           </div>
         </CardContent>
