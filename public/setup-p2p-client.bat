@@ -345,5 +345,12 @@ pause
 
 REM Auto-start the client
 echo Starting P2P client now...
+echo.
+echo You can also manually start the client by:
+echo 1. Running the desktop shortcut "BucketLynx P2P - %BUCKET_NAME%"
+echo 2. Or running "start-client.bat" in %SYNC_PATH%
+echo.
+echo Press any key to start the P2P client now...
+pause >nul
 cd /d "%SYNC_PATH%"
-start "BucketLynx P2P - %BUCKET_NAME%" cmd /k "node sync-client.js"
+start "BucketLynx P2P - %BUCKET_NAME%" cmd /k "echo Starting BucketLynx P2P Client for %BUCKET_NAME%... && node sync-client.js"

@@ -20,15 +20,36 @@ serve(async (req) => {
 
     const url = new URL(req.url)
     const pathParts = url.pathname.split('/')
-    const userId = pathParts[pathParts.length - 1]
+    
+    // Get user ID from Authorization header
+    const authHeader = req.headers.get('Authorization')
+    let userId = null
+    
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const token = authHeader.replace('Bearer ', '')
+        const payload = JSON.parse(atob(token.split('.')[1]))
+        userId = payload.sub
+      } catch (e) {
+        console.log('Could not parse token:', e)
+      }
+    }
+
+    // Fallback: try to get user ID from path if available
+    if (!userId && pathParts.length > 2) {
+      const pathUserId = pathParts[pathParts.length - 1]
+      if (pathUserId && pathUserId !== 'sync') {
+        userId = pathUserId
+      }
+    }
 
     console.log('Sync request:', { method: req.method, userId, pathname: url.pathname })
 
-    if (!userId || userId === 'sync') {
+    if (!userId) {
       return new Response(
-        JSON.stringify({ error: 'User ID required in path' }),
+        JSON.stringify({ error: 'User authentication required' }),
         { 
-          status: 400,
+          status: 401,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       )
