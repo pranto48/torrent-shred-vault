@@ -80,7 +80,7 @@ echo   res.send(`
 echo   ^<!DOCTYPE html^>
 echo   ^<html^>
 echo   ^<head^>
-echo     ^<title^>BucketLynx P2P Sync - ${BUCKET_NAME}^</title^>
+echo     ^<title^>BucketLynx P2P Sync - $^{BUCKET_NAME^}^</title^>
 echo     ^<style^>
 echo       body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
 echo       .container { max-width: 1200px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1^); }
@@ -99,7 +99,7 @@ echo   ^<body^>
 echo     ^<div class="container"^>
 echo       ^<div class="header"^>
 echo         ^<h1^>🚀 BucketLynx P2P Sync^</h1^>
-echo         ^<p^>Bucket: ^<strong^>${BUCKET_NAME}^</strong^> • Path: ^<strong^>${SYNC_PATH}^</strong^>^</p^>
+echo         ^<p^>Bucket: ^<strong^>$^{BUCKET_NAME^}^</strong^> • Path: ^<strong^>$^{SYNC_PATH^}^</strong^>^</p^>
 echo       ^</div^>
 echo       ^<div class="status"^>
 echo         ^<div class="stat-card"^>
@@ -147,14 +147,14 @@ echo
 echo         const filesList = document.getElementById('filesList'^);
 echo         if (data.files^) {
 echo           filesList.innerHTML = data.files.map(f =^> 
-echo             `^<div class="file-item $^{f.active ? 'file-active' : ''^}$^{f.name^} - $^{f.progress^}%% - $^{f.peers^} peers^</div^>`
+echo             `^<div class="file-item $^{f.active ? 'file-active' : ''^}"^>$^{f.name^} - $^{f.progress^}%% - $^{f.peers^} peers^</div^>`
 echo           ^).join(''^);
 echo         }
 echo       }
 echo       
 echo       function addLog(message^) {
 echo         const timestamp = new Date(^).toLocaleTimeString(^);
-echo         log.innerHTML += `${timestamp}: ${message}\n`;
+echo         log.innerHTML += `$^{timestamp^}: $^{message^}\n`;
 echo         log.scrollTop = log.scrollHeight;
 echo       }
 echo       
@@ -192,7 +192,7 @@ echo   ignored: /^\./, persistent: true
 echo }^);
 echo.
 echo sharedWatcher.on('add', (filePath^) =^> {
-echo   console.log(`New file detected: ${filePath}`^);
+echo   console.log(`New file detected: $^{filePath^}`^);
 echo   seedFile(filePath^);
 echo }^);
 echo.
@@ -203,28 +203,28 @@ echo }^);
 echo.
 echo magnetWatcher.on('add', (filePath^) =^> {
 echo   if (path.extname(filePath^) === '.magnet'^) {
-echo     console.log(`New magnet file: ${filePath}`^);
+echo     console.log(`New magnet file: $^{filePath^}`^);
 echo     processMagnetFile(filePath^);
 echo   }
 echo }^);
 echo.
 echo function seedFile(filePath^) {
 echo   client.seed(filePath, (torrent^) =^> {
-echo     console.log(`Seeding: ${torrent.name}`^);
+echo     console.log(`Seeding: $^{torrent.name^}`^);
 echo     const magnetLink = torrent.magnetURI;
 echo     
 echo     // Save magnet link
-echo     const magnetFile = path.join(SYNC_PATH, 'torrents', `${path.basename(filePath^)}.magnet`^);
+echo     const magnetFile = path.join(SYNC_PATH, 'torrents', `$^{path.basename(filePath^)^}.magnet`^);
 echo     fs.writeFileSync(magnetFile, magnetLink^);
 echo     
 echo     notifier.notify({
 echo       title: 'BucketLynx P2P',
-echo       message: `Now seeding: ${torrent.name}`,
+echo       message: `Now seeding: $^{torrent.name^}`,
 echo       timeout: 3000
 echo     }^);
 echo     
 echo     broadcastUpdate({
-echo       message: `Started seeding: ${torrent.name}`,
+echo       message: `Started seeding: $^{torrent.name^}`,
 echo       torrents: client.torrents.length,
 echo       files: getTorrentStats(^)
 echo     }^);
@@ -235,25 +235,25 @@ echo function processMagnetFile(magnetFilePath^) {
 echo   const magnetLink = fs.readFileSync(magnetFilePath, 'utf8'^).trim(^);
 echo   
 echo   client.add(magnetLink, { path: path.join(SYNC_PATH, 'downloads'^) }, (torrent^) =^> {
-echo     console.log(`Downloading: ${torrent.name}`^);
+echo     console.log(`Downloading: $^{torrent.name^}`^);
 echo     
 echo     notifier.notify({
 echo       title: 'BucketLynx P2P',
-echo       message: `Started download: ${torrent.name}`,
+echo       message: `Started download: $^{torrent.name^}`,
 echo       timeout: 3000
 echo     }^);
 echo     
 echo     torrent.on('done', (^) =^> {
-echo       console.log(`Download completed: ${torrent.name}`^);
+echo       console.log(`Download completed: $^{torrent.name^}`^);
 echo       notifier.notify({
 echo         title: 'BucketLynx P2P',
-echo         message: `Download completed: ${torrent.name}`,
+echo         message: `Download completed: $^{torrent.name^}`,
 echo         timeout: 5000
 echo       }^);
 echo     }^);
 echo     
 echo     broadcastUpdate({
-echo       message: `Started download: ${torrent.name}`,
+echo       message: `Started download: $^{torrent.name^}`,
 echo       torrents: client.torrents.length,
 echo       files: getTorrentStats(^)
 echo     }^);
@@ -286,15 +286,15 @@ echo }, 2000^);
 echo.
 echo // Start the server
 echo app.listen(PORT, (^) =^> {
-echo   console.log(`BucketLynx P2P Client running at http://localhost:${PORT}`^);
-echo   console.log(`Bucket: ${BUCKET_NAME}`^);
-echo   console.log(`Sync Path: ${SYNC_PATH}`^);
+echo   console.log(`BucketLynx P2P Client running at http://localhost:$^{PORT^}`^);
+echo   console.log(`Bucket: $^{BUCKET_NAME^}`^);
+echo   console.log(`Sync Path: $^{SYNC_PATH^}`^);
 echo   console.log('Place files in "shared" folder to seed them'^);
 echo   console.log('Place .magnet files in "torrents" folder to download'^);
 echo   
 echo   notifier.notify({
 echo     title: 'BucketLynx P2P Client',
-echo     message: `Started for bucket: ${BUCKET_NAME}`,
+echo     message: `Started for bucket: $^{BUCKET_NAME^}`,
 echo     timeout: 5000
 echo   }^);
 echo }^);
