@@ -147,14 +147,14 @@ echo
 echo         const filesList = document.getElementById('filesList'^);
 echo         if (data.files^) {
 echo           filesList.innerHTML = data.files.map(f =^> 
-echo             `^<div class="file-item $^{f.active ? 'file-active' : ''^}"^>$^{f.name^} - $^{f.progress^}%% - $^{f.peers^} peers^</div^>`
+echo             `^<div class="file-item ${f.active ? 'file-active' : ''}"^>${f.name} - ${f.progress}%% - ${f.peers} peers^</div^>`
 echo           ^).join(''^);
 echo         }
 echo       }
 echo       
 echo       function addLog(message^) {
 echo         const timestamp = new Date(^).toLocaleTimeString(^);
-echo         log.innerHTML += `$^{timestamp^}: $^{message^}\n`;
+echo         log.innerHTML += `${timestamp}: ${message}\n`;
 echo         log.scrollTop = log.scrollHeight;
 echo       }
 echo       
