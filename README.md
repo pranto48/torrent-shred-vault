@@ -100,3 +100,31 @@ VITE_SUPABASE_ANON_KEY=local-dev-anon-key
 ```
 
 > Note: The app expects a Supabase-compatible backend for auth/storage APIs. The bundled PostgreSQL container provides a local database service, while Supabase URL/key can be pointed to your own local or hosted Supabase stack.
+
+## API service (JWT + RBAC)
+
+A new API service is included under `api/` and runs in Docker Compose on `http://localhost:3000`.
+
+### Features
+
+- JWT auth (`/api/auth/register`, `/api/auth/login`, `/api/me`)
+- RBAC roles: `user`, `admin`
+- Admin-only endpoint: `/api/admin/users`
+- User/Admin endpoint: `/api/vaults`
+- Automatic DB bootstrap for `app_users` table
+- Optional default admin seeding via env vars
+
+### Default admin (Docker)
+
+By default compose seeds an admin user using:
+
+- Email: `mail@arifmahmud.com`
+- Password: `ITSupp0rtbd`
+
+Override in `.env`:
+
+```env
+DEFAULT_ADMIN_EMAIL=mail@arifmahmud.com
+DEFAULT_ADMIN_PASSWORD=ITSupp0rtbd
+JWT_SECRET=replace-with-strong-secret
+```

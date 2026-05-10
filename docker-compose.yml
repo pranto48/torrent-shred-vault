@@ -9,6 +9,25 @@ services:
       - "8080:80"
     depends_on:
       - db
+      - api
+
+  api:
+    build:
+      context: ./api
+    environment:
+      API_PORT: 3000
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB:-torrent_shred_vault}
+      DB_USER: ${POSTGRES_USER:-torrent_user}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-torrent_password}
+      JWT_SECRET: ${JWT_SECRET:-change-this-in-production}
+      DEFAULT_ADMIN_EMAIL: ${DEFAULT_ADMIN_EMAIL:-mail@arifmahmud.com}
+      DEFAULT_ADMIN_PASSWORD: ${DEFAULT_ADMIN_PASSWORD:-ITSupp0rtbd}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - db
 
   db:
     image: postgres:16-alpine
