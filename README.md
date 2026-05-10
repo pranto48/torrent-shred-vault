@@ -71,3 +71,93 @@ Yes, you can!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+
+## Docker deployment
+
+You can run Torrent Shred Vault in Docker and provision a local PostgreSQL database with Docker Compose.
+
+### 1) Build and run
+
+```sh
+docker compose up --build -d
+```
+
+- Web app: `http://localhost:8080`
+- PostgreSQL: `localhost:5432`
+
+### 2) Optional configuration
+
+Create a `.env` file in the project root to override defaults:
+
+```env
+POSTGRES_DB=torrent_shred_vault
+POSTGRES_USER=torrent_user
+POSTGRES_PASSWORD=change_me
+
+# Frontend build-time Supabase values
+VITE_SUPABASE_URL=http://localhost:54321
+VITE_SUPABASE_ANON_KEY=local-dev-anon-key
+```
+
+> Note: The app expects a Supabase-compatible backend for auth/storage APIs. The bundled PostgreSQL container provides a local database service, while Supabase URL/key can be pointed to your own local or hosted Supabase stack.
+
+## API service (JWT + RBAC)
+
+A new API service is included under `api/` and runs in Docker Compose on `http://localhost:3000`.
+
+### Features
+
+- JWT auth (`/api/auth/register`, `/api/auth/login`, `/api/me`)
+- RBAC roles: `user`, `admin`
+- Admin-only endpoint: `/api/admin/users`
+- User/Admin endpoint: `/api/vaults`
+- Automatic DB bootstrap for `app_users` table
+- Optional default admin seeding via env vars
+
+### Default admin (Docker)
+
+By default compose seeds an admin user using:
+
+- Email: `mail@arifmahmud.com`
+- Password: `ITSupp0rtbd`
+
+Override in `.env`:
+
+```env
+DEFAULT_ADMIN_EMAIL=mail@arifmahmud.com
+DEFAULT_ADMIN_PASSWORD=ITSupp0rtbd
+JWT_SECRET=replace-with-strong-secret
+```
+
+### PostgreSQL schema migrations
+
+API migrations are versioned SQL files in `api/migrations/`.
+
+- `0001_init.sql` creates:
+  - `app_users`
+  - `pgcrypto` extension
+- API startup runs migrations in sorted order.
+- Applied migrations are recorded in `schema_migrations`.
+
+## Object storage service (MinIO)
+
+Docker Compose now includes MinIO for local object storage.
+
+- S3 API endpoint: `http://localhost:9000`
+- MinIO Console: `http://localhost:9001`
+- Default credentials:
+  - Access key: `minioadmin`
+  - Secret key: `minioadmin123`
+
+### MinIO environment variables
+
+```env
+MINIO_ROOT_USER=minioadmin
+MINIO_ROOT_PASSWORD=minioadmin123
+MINIO_BUCKET=vault-data
+MINIO_ENDPOINT=minio
+MINIO_PORT=9000
+MINIO_USE_SSL=false
+```
+
+The API service is preconfigured with these variables so the next storage integration step can directly create/read encrypted vault objects in MinIO.
