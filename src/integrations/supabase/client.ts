@@ -2,8 +2,11 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = "https://xoatoskjxjzoambdijtu.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhvYXRvc2tqeGp6b2FtYmRpanR1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM2ODc0MjMsImV4cCI6MjA2OTI2MzQyM30.6pNFBh-Ceplrn_HONoO8NZMM8CPJXen029AVXODwQbA";
+const SUPABASE_URL =
+  import.meta.env.VITE_SUPABASE_URL ?? "https://xoatoskjxjzoambdijtu.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY =
+  import.meta.env.VITE_SUPABASE_ANON_KEY ??
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhvYXRvc2tqeGp6b2FtYmRpanR1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM2ODc0MjMsImV4cCI6MjA2OTI2MzQyM30.6pNFBh-Ceplrn_HONoO8NZMM8CPJXen029AVXODwQbA";
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
@@ -13,5 +16,5 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
-  }
+  },
 });

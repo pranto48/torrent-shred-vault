@@ -1,0 +1,46 @@
+services:
+  app:
+    build:
+      context: .
+      args:
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-http://localhost:54321}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:-local-dev-anon-key}
+    ports:
+      - "8080:80"
+    depends_on:
+      - db
+      - api
+
+  api:
+    build:
+      context: ./api
+    environment:
+      API_PORT: 3000
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB:-torrent_shred_vault}
+      DB_USER: ${POSTGRES_USER:-torrent_user}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-torrent_password}
+      JWT_SECRET: ${JWT_SECRET:-change-this-in-production}
+      DEFAULT_ADMIN_EMAIL: ${DEFAULT_ADMIN_EMAIL:-mail@arifmahmud.com}
+      DEFAULT_ADMIN_PASSWORD: ${DEFAULT_ADMIN_PASSWORD:-ITSupp0rtbd}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - db
+
+  db:
+    image: postgres:16-alpine
+    container_name: torrent-shred-vault-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-torrent_shred_vault}
+      POSTGRES_USER: ${POSTGRES_USER:-torrent_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-torrent_password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
