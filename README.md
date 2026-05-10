@@ -187,3 +187,20 @@ Implemented in API:
 Schema added in `0003_key_management.sql`:
 - `user_security`
 - `vault_keys`
+
+## Encrypted chunk upload/download
+
+Added encrypted chunk APIs backed by MinIO object storage:
+
+- `POST /api/chunks/upload?vaultId=<vault_uuid>`
+  - Auth: Bearer token
+  - Header: `x-vault-password: <user_password>`
+  - Body: raw bytes (`application/octet-stream`)
+  - Flow: derive KEK -> unwrap vault DEK -> encrypt chunk with AES-256-GCM -> store ciphertext in MinIO -> store metadata in `vault_chunks`
+
+- `GET /api/chunks/:chunkId/download`
+  - Auth: Bearer token
+  - Header: `x-vault-password: <user_password>`
+  - Flow: load encrypted object + metadata -> unwrap DEK -> decrypt -> return raw bytes
+
+Schema: `api/migrations/0004_chunks.sql` creates `vault_chunks`.
