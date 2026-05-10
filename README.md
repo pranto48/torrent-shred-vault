@@ -174,3 +174,16 @@ Behavior:
 - Default admin seeding also auto-creates both vaults.
 - `POST /api/vaults` creates or renames a vault by type for current user.
 - `GET /api/vaults` returns persisted vault records for current user.
+
+## Key management (Argon2id + KEK/DEK wrapping)
+
+Implemented in API:
+
+- Password hashing: Argon2id (`user_security.password_hash`)
+- KEK derivation: Argon2id raw 32-byte key using per-user salt (`user_security.salt`)
+- DEK generation: random 32-byte DEK per vault
+- DEK wrapping: AES-256-GCM (`vault_keys.wrapped_dek`, `wrap_iv`, `wrap_tag`)
+
+Schema added in `0003_key_management.sql`:
+- `user_security`
+- `vault_keys`
