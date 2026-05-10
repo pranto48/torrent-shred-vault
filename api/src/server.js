@@ -21,21 +21,37 @@ const loginSchema = z.object({
   password: z.string().min(8),
 });
 
+const createVaultSchema = z.object({
+  type: z.enum(['user_vault', 'share_vault']),
+  name: z.string().min(1).max(120).optional(),
+});
+
 async function ensureDefaultAdmin() {
   const email = process.env.DEFAULT_ADMIN_EMAIL;
   const password = process.env.DEFAULT_ADMIN_PASSWORD;
-
   if (!email || !password) return;
 
   const existing = await pool.query('SELECT id FROM app_users WHERE email = $1', [email]);
   if (existing.rowCount) return;
 
   const passwordHash = await bcrypt.hash(password, 12);
-  await pool.query('INSERT INTO app_users (email, password_hash, role) VALUES ($1, $2, $3)', [
-    email,
-    passwordHash,
-    'admin',
-  ]);
+  const created = await pool.query(
+    'INSERT INTO app_users (email, password_hash, role) VALUES ($1, $2, $3) RETURNING id',
+    [email, passwordHash, 'admin'],
+  );
+
+  const userId = created.rows[0].id;
+  await createDefaultVaultsForUser(userId);
+}
+
+async function createDefaultVaultsForUser(userId) {
+  await pool.query(
+    `INSERT INTO vaults (user_id, type, name)
+     VALUES ($1, 'user_vault', 'User Vault'),
+            ($1, 'share_vault', 'Share Vault')
+     ON CONFLICT (user_id, type) DO NOTHING`,
+    [userId],
+  );
 }
 
 app.get('/health', async (_req, res) => {
@@ -50,22 +66,34 @@ app.post('/api/auth/register', async (req, res) => {
   const { email, password, role = 'user' } = payload.data;
   const passwordHash = await bcrypt.hash(password, 12);
 
+  const client = await pool.connect();
   try {
-    const result = await pool.query(
+    await client.query('BEGIN');
+    const result = await client.query(
       'INSERT INTO app_users (email, password_hash, role) VALUES ($1, $2, $3) RETURNING id, email, role, created_at',
       [email, passwordHash, role],
     );
 
     const user = result.rows[0];
+    await client.query(
+      `INSERT INTO vaults (user_id, type, name)
+       VALUES ($1, 'user_vault', 'User Vault'),
+              ($1, 'share_vault', 'Share Vault')
+       ON CONFLICT (user_id, type) DO NOTHING`,
+      [user.id],
+    );
+
+    await client.query('COMMIT');
+
     const token = signToken(user);
     return res.status(201).json({ user, token });
   } catch (error) {
-    if (error.code === '23505') {
-      return res.status(409).json({ error: 'Email already exists' });
-    }
-
+    await client.query('ROLLBACK');
+    if (error.code === '23505') return res.status(409).json({ error: 'Email already exists' });
     console.error(error);
     return res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    client.release();
   }
 });
 
@@ -96,13 +124,35 @@ app.get('/api/admin/users', authenticate, authorize('admin'), async (_req, res) 
   return res.json({ users: result.rows });
 });
 
-app.get('/api/vaults', authenticate, authorize('user', 'admin'), (req, res) => {
-  return res.json({
-    vaults: [
-      { id: `user-vault-${req.user.sub}`, type: 'user_vault', name: 'User Vault' },
-      { id: `share-vault-${req.user.sub}`, type: 'share_vault', name: 'Share Vault' },
-    ],
-  });
+app.post('/api/vaults', authenticate, authorize('user', 'admin'), async (req, res) => {
+  const payload = createVaultSchema.safeParse(req.body);
+  if (!payload.success) return res.status(400).json({ error: payload.error.flatten() });
+
+  const { type, name } = payload.data;
+  const resolvedName = name ?? (type === 'user_vault' ? 'User Vault' : 'Share Vault');
+
+  try {
+    const result = await pool.query(
+      `INSERT INTO vaults (user_id, type, name)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (user_id, type) DO UPDATE SET name = EXCLUDED.name
+       RETURNING id, user_id, type, name, created_at`,
+      [req.user.sub, type, resolvedName],
+    );
+
+    return res.status(201).json({ vault: result.rows[0] });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: 'Failed to create vault' });
+  }
+});
+
+app.get('/api/vaults', authenticate, authorize('user', 'admin'), async (req, res) => {
+  const result = await pool.query(
+    'SELECT id, user_id, type, name, created_at FROM vaults WHERE user_id = $1 ORDER BY created_at ASC',
+    [req.user.sub],
+  );
+  return res.json({ vaults: result.rows });
 });
 
 const port = Number(process.env.API_PORT ?? 3000);

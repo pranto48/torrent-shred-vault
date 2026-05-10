@@ -161,3 +161,16 @@ MINIO_USE_SSL=false
 ```
 
 The API service is preconfigured with these variables so the next storage integration step can directly create/read encrypted vault objects in MinIO.
+
+## Vault creation
+
+Vault model now persists in PostgreSQL:
+
+- `user_vault` (private user drive)
+- `share_vault` (share drive)
+
+Behavior:
+- On user registration, both default vaults are auto-created.
+- Default admin seeding also auto-creates both vaults.
+- `POST /api/vaults` creates or renames a vault by type for current user.
+- `GET /api/vaults` returns persisted vault records for current user.
