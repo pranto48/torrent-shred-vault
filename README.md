@@ -128,3 +128,13 @@ DEFAULT_ADMIN_EMAIL=mail@arifmahmud.com
 DEFAULT_ADMIN_PASSWORD=ITSupp0rtbd
 JWT_SECRET=replace-with-strong-secret
 ```
+
+### PostgreSQL schema migrations
+
+API migrations are versioned SQL files in `api/migrations/`.
+
+- `0001_init.sql` creates:
+  - `app_users`
+  - `pgcrypto` extension
+- API startup runs migrations in sorted order.
+- Applied migrations are recorded in `schema_migrations`.
