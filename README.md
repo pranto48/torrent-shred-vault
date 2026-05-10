@@ -71,3 +71,32 @@ Yes, you can!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+
+## Docker deployment
+
+You can run Torrent Shred Vault in Docker and provision a local PostgreSQL database with Docker Compose.
+
+### 1) Build and run
+
+```sh
+docker compose up --build -d
+```
+
+- Web app: `http://localhost:8080`
+- PostgreSQL: `localhost:5432`
+
+### 2) Optional configuration
+
+Create a `.env` file in the project root to override defaults:
+
+```env
+POSTGRES_DB=torrent_shred_vault
+POSTGRES_USER=torrent_user
+POSTGRES_PASSWORD=change_me
+
+# Frontend build-time Supabase values
+VITE_SUPABASE_URL=http://localhost:54321
+VITE_SUPABASE_ANON_KEY=local-dev-anon-key
+```
+
+> Note: The app expects a Supabase-compatible backend for auth/storage APIs. The bundled PostgreSQL container provides a local database service, while Supabase URL/key can be pointed to your own local or hosted Supabase stack.
