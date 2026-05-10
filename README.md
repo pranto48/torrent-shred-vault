@@ -138,3 +138,26 @@ API migrations are versioned SQL files in `api/migrations/`.
   - `pgcrypto` extension
 - API startup runs migrations in sorted order.
 - Applied migrations are recorded in `schema_migrations`.
+
+## Object storage service (MinIO)
+
+Docker Compose now includes MinIO for local object storage.
+
+- S3 API endpoint: `http://localhost:9000`
+- MinIO Console: `http://localhost:9001`
+- Default credentials:
+  - Access key: `minioadmin`
+  - Secret key: `minioadmin123`
+
+### MinIO environment variables
+
+```env
+MINIO_ROOT_USER=minioadmin
+MINIO_ROOT_PASSWORD=minioadmin123
+MINIO_BUCKET=vault-data
+MINIO_ENDPOINT=minio
+MINIO_PORT=9000
+MINIO_USE_SSL=false
+```
+
+The API service is preconfigured with these variables so the next storage integration step can directly create/read encrypted vault objects in MinIO.
