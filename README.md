@@ -224,3 +224,13 @@ UPDATE_REPO_URL=https://github.com/pranto48/torrent-shred-vault.git
 UPDATE_REPO_BRANCH=work
 UPDATE_REPO_PATH=/app
 ```
+
+### SPA routing in Docker (fix for /auth 404)
+
+Nginx is configured with SPA fallback (`try_files ... /index.html`) so client routes like:
+
+- `/auth`
+- `/dashboard`
+- any in-app route
+
+work correctly when opened directly in Docker deployment.
