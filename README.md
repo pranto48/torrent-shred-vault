@@ -119,13 +119,13 @@ A new API service is included under `api/` and runs in Docker Compose on `http:/
 By default compose seeds an admin user using:
 
 - Email: `mail@arifmahmud.com`
-- Password: `ITSupp0rtbd`
+- Password: `password`
 
 Override in `.env`:
 
 ```env
 DEFAULT_ADMIN_EMAIL=mail@arifmahmud.com
-DEFAULT_ADMIN_PASSWORD=ITSupp0rtbd
+DEFAULT_ADMIN_PASSWORD=password
 JWT_SECRET=replace-with-strong-secret
 ```
 
@@ -204,3 +204,23 @@ Added encrypted chunk APIs backed by MinIO object storage:
   - Flow: load encrypted object + metadata -> unwrap DEK -> decrypt -> return raw bytes
 
 Schema: `api/migrations/0004_chunks.sql` creates `vault_chunks`.
+
+### Admin update API (GitHub source sync)
+
+Admin panel can call these endpoints:
+
+- `GET /api/admin/update/check`
+  - compares local `HEAD` with remote branch from `UPDATE_REPO_URL` / `UPDATE_REPO_BRANCH`
+  - returns `hasUpdate: true|false`
+
+- `POST /api/admin/update/apply`
+  - fetches + hard resets local repo to remote branch head
+  - response asks for container restart to apply rebuilt code
+
+Config env vars:
+
+```env
+UPDATE_REPO_URL=https://github.com/pranto48/torrent-shred-vault.git
+UPDATE_REPO_BRANCH=work
+UPDATE_REPO_PATH=/app
+```

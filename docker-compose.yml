@@ -23,7 +23,7 @@ services:
       DB_PASSWORD: ${POSTGRES_PASSWORD:-torrent_password}
       JWT_SECRET: ${JWT_SECRET:-change-this-in-production}
       DEFAULT_ADMIN_EMAIL: ${DEFAULT_ADMIN_EMAIL:-mail@arifmahmud.com}
-      DEFAULT_ADMIN_PASSWORD: ${DEFAULT_ADMIN_PASSWORD:-ITSupp0rtbd}
+      DEFAULT_ADMIN_PASSWORD: ${DEFAULT_ADMIN_PASSWORD:-password}
       MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio}
       MINIO_PORT: ${MINIO_PORT:-9000}
       MINIO_USE_SSL: ${MINIO_USE_SSL:-false}
