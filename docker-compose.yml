@@ -1,0 +1,68 @@
+services:
+  app:
+    build:
+      context: .
+      args:
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-http://localhost:54321}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:-local-dev-anon-key}
+    ports:
+      - "8080:80"
+    depends_on:
+      - db
+      - api
+
+  api:
+    build:
+      context: ./api
+    environment:
+      API_PORT: 3000
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB:-torrent_shred_vault}
+      DB_USER: ${POSTGRES_USER:-torrent_user}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-torrent_password}
+      JWT_SECRET: ${JWT_SECRET:-change-this-in-production}
+      DEFAULT_ADMIN_EMAIL: ${DEFAULT_ADMIN_EMAIL:-mail@arifmahmud.com}
+      DEFAULT_ADMIN_PASSWORD: ${DEFAULT_ADMIN_PASSWORD:-password}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio}
+      MINIO_PORT: ${MINIO_PORT:-9000}
+      MINIO_USE_SSL: ${MINIO_USE_SSL:-false}
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+      MINIO_BUCKET: ${MINIO_BUCKET:-vault-data}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - db
+      - minio
+
+  db:
+    image: postgres:16-alpine
+    container_name: torrent-shred-vault-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-torrent_shred_vault}
+      POSTGRES_USER: ${POSTGRES_USER:-torrent_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-torrent_password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  minio:
+    image: minio/minio:latest
+    container_name: torrent-shred-vault-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+
+volumes:
+  postgres_data:
+  minio_data:
