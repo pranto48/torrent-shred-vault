@@ -2,18 +2,16 @@ services:
   app:
     build:
       context: .
-      args:
-        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-http://localhost:54321}
-        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:-local-dev-anon-key}
+    restart: unless-stopped
     ports:
-      - "8080:80"
+      - "${WEB_PORT:-4400}:80"
     depends_on:
-      - db
       - api
 
   api:
     build:
       context: ./api
+    restart: unless-stopped
     environment:
       API_PORT: 3000
       DB_HOST: db
@@ -23,18 +21,20 @@ services:
       DB_PASSWORD: ${POSTGRES_PASSWORD:-torrent_password}
       JWT_SECRET: ${JWT_SECRET:-change-this-in-production}
       DEFAULT_ADMIN_EMAIL: ${DEFAULT_ADMIN_EMAIL:-mail@arifmahmud.com}
-      DEFAULT_ADMIN_PASSWORD: ${DEFAULT_ADMIN_PASSWORD:-password}
+      DEFAULT_ADMIN_PASSWORD: ${DEFAULT_ADMIN_PASSWORD:-change-this-admin-password}
+      SHARE_VAULT_SECRET: ${SHARE_VAULT_SECRET:-change-this-share-secret}
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-http://192.168.20.5:4400}
+      UPDATER_URL: ${UPDATER_URL:-http://updater:3100}
       MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio}
       MINIO_PORT: ${MINIO_PORT:-9000}
       MINIO_USE_SSL: ${MINIO_USE_SSL:-false}
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin123}
       MINIO_BUCKET: ${MINIO_BUCKET:-vault-data}
-    ports:
-      - "3000:3000"
     depends_on:
       - db
       - minio
+      - updater
 
   db:
     image: postgres:16-alpine
@@ -44,8 +44,6 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-torrent_shred_vault}
       POSTGRES_USER: ${POSTGRES_USER:-torrent_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-torrent_password}
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
@@ -57,12 +55,25 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin123}
-    ports:
-      - "9000:9000"
-      - "9001:9001"
     volumes:
       - minio_data:/data
+
+  updater:
+    build:
+      context: ./updater
+    restart: unless-stopped
+    environment:
+      UPDATE_REPO_URL: ${UPDATE_REPO_URL:-https://github.com/pranto48/torrent-shred-vault.git}
+      UPDATE_REPO_BRANCH: ${UPDATE_REPO_BRANCH:-main}
+      UPDATE_REPO_PATH: /workspace
+      UPDATE_STATE_DIR: /state
+      COMPOSE_PROJECT_NAME: ${COMPOSE_PROJECT_NAME:-torrent-shred-vault}
+    volumes:
+      - .:/workspace
+      - updater_state:/state
+      - /var/run/docker.sock:/var/run/docker.sock
 
 volumes:
   postgres_data:
   minio_data:
+  updater_state:

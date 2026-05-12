@@ -18,12 +18,21 @@ const __dirname = path.dirname(__filename);
 const migrationsDir = path.resolve(__dirname, '../migrations');
 
 export async function runMigrations() {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS schema_migrations (
-      version TEXT PRIMARY KEY,
-      applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-  `);
+  for (let attempt = 1; attempt <= 30; attempt += 1) {
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS schema_migrations (
+          version TEXT PRIMARY KEY,
+          applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+      `);
+      break;
+    } catch (error) {
+      if (attempt === 30) throw error;
+      console.log(`Waiting for database (${attempt}/30)...`);
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+  }
 
   const files = (await fs.readdir(migrationsDir))
     .filter((name) => name.endsWith('.sql'))

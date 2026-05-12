@@ -1,101 +1,71 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User, Session } from '@supabase/supabase-js';
-import { supabase } from '@/integrations/supabase/client';
+import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { api, ApiUser, getToken, setToken } from "@/lib/api";
 
 interface AuthContextType {
-  user: User | null;
-  session: Session | null;
+  user: ApiUser | null;
   isAdmin: boolean;
   loading: boolean;
+  login: (email: string, password: string) => Promise<void>;
+  register: (email: string, password: string) => Promise<void>;
+  logout: () => void;
+  refresh: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType>({
-  user: null,
-  session: null,
-  isAdmin: false,
-  loading: true,
-});
+const AuthContext = createContext<AuthContextType | null>(null);
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
+  if (!context) throw new Error("useAuth must be used within an AuthProvider");
   return context;
 };
 
-interface AuthProviderProps {
-  children: ReactNode;
-}
-
-export const AuthProvider = ({ children }: AuthProviderProps) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  const [user, setUser] = useState<ApiUser | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const checkAdminStatus = async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('user_roles')
-        .select('role, is_active')
-        .eq('user_id', userId)
-        .eq('role', 'admin')
-        .eq('is_active', true)
-        .single();
-      
-      // If table doesn't exist or query fails, default to non-admin
-      if (error) {
-        console.log('Admin check failed (table may not exist):', error);
-        setIsAdmin(false);
-        return;
-      }
-      
-      setIsAdmin(!!data);
-    } catch (error) {
-      console.log('Admin check error:', error);
-      setIsAdmin(false);
-    }
-  };
-
-  useEffect(() => {
-    // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        setLoading(false);
-        
-        // Defer admin status check to avoid blocking auth flow
-        if (session?.user) {
-          setTimeout(() => {
-            checkAdminStatus(session.user.id);
-          }, 0);
-        } else {
-          setIsAdmin(false);
-        }
-      }
-    );
-
-    // Check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+  const refresh = useCallback(async () => {
+    if (!getToken()) {
+      setUser(null);
       setLoading(false);
-      
-      if (session?.user) {
-        setTimeout(() => {
-          checkAdminStatus(session.user.id);
-        }, 0);
-      }
-    });
+      return;
+    }
 
-    return () => subscription.unsubscribe();
+    try {
+      const result = await api.me();
+      setUser(result.user);
+    } catch {
+      setToken(null);
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  return (
-    <AuthContext.Provider value={{ user, session, isAdmin, loading }}>
-      {children}
-    </AuthContext.Provider>
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  const login = useCallback(async (email: string, password: string) => {
+    const result = await api.login(email, password);
+    setToken(result.token);
+    setUser(result.user);
+  }, []);
+
+  const register = useCallback(async (email: string, password: string) => {
+    const result = await api.register(email, password);
+    setToken(result.token);
+    setUser(result.user);
+  }, []);
+
+  const logout = useCallback(() => {
+    setToken(null);
+    setUser(null);
+  }, []);
+
+  const value = useMemo(
+    () => ({ user, isAdmin: user?.role === "admin", loading, login, register, logout, refresh }),
+    [user, loading, login, register, logout, refresh],
   );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
