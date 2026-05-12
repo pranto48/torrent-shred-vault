@@ -1,0 +1,10 @@
+CREATE TABLE IF NOT EXISTS vault_chunks (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  vault_id UUID NOT NULL REFERENCES vaults(id) ON DELETE CASCADE,
+  object_key TEXT NOT NULL UNIQUE,
+  sha256 TEXT NOT NULL,
+  size_bytes BIGINT NOT NULL,
+  enc_iv BYTEA NOT NULL,
+  enc_tag BYTEA NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
