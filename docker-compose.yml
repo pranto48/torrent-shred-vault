@@ -21,10 +21,13 @@ services:
       DB_PASSWORD: ${POSTGRES_PASSWORD:-torrent_password}
       JWT_SECRET: ${JWT_SECRET:-change-this-in-production}
       DEFAULT_ADMIN_EMAIL: ${DEFAULT_ADMIN_EMAIL:-mail@arifmahmud.com}
-      DEFAULT_ADMIN_PASSWORD: ${DEFAULT_ADMIN_PASSWORD:-change-this-admin-password}
+      DEFAULT_ADMIN_PASSWORD: ${DEFAULT_ADMIN_PASSWORD:-password}
       SHARE_VAULT_SECRET: ${SHARE_VAULT_SECRET:-change-this-share-secret}
-      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-http://192.168.20.5:4400}
+      PEER_TRANSFER_SECRET: ${PEER_TRANSFER_SECRET:-change-this-peer-secret}
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-}
       UPDATER_URL: ${UPDATER_URL:-http://updater:3100}
+      SYNC_TRANSPORT_MODE: ${SYNC_TRANSPORT_MODE:-peer}
+      PEER_DEFAULT_PORT: ${PEER_DEFAULT_PORT:-44888}
       MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio}
       MINIO_PORT: ${MINIO_PORT:-9000}
       MINIO_USE_SSL: ${MINIO_USE_SSL:-false}
@@ -68,6 +71,7 @@ services:
       UPDATE_REPO_PATH: /workspace
       UPDATE_STATE_DIR: /state
       COMPOSE_PROJECT_NAME: ${COMPOSE_PROJECT_NAME:-torrent-shred-vault}
+      ALLOW_DIRTY_UPDATE: ${ALLOW_DIRTY_UPDATE:-false}
     volumes:
       - .:/workspace
       - updater_state:/state

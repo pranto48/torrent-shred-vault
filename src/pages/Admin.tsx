@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Database, RefreshCw, Shield, UploadCloud, Users } from "lucide-react";
+import { ArrowLeft, Database, KeyRound, RefreshCw, Shield, UploadCloud, Users } from "lucide-react";
 import { api, formatBytes, UpdateCheck, UpdateHistory, UpdateStatus } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type AdminUser = {
@@ -27,6 +30,8 @@ const Admin = () => {
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus | null>(null);
   const [history, setHistory] = useState<UpdateHistory[]>([]);
   const [busy, setBusy] = useState(false);
+  const [resetTarget, setResetTarget] = useState<AdminUser | null>(null);
+  const [resetPassword, setResetPassword] = useState("");
 
   useEffect(() => {
     if (!loading && (!user || !isAdmin)) navigate("/auth");
@@ -69,6 +74,28 @@ const Admin = () => {
       toast({ title: "Update started", description: result.message ?? "Docker updater is rebuilding the app." });
     } catch (error) {
       toast({ title: "Update failed", description: error instanceof Error ? error.message : "Request failed", variant: "destructive" });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const resetUserPassword = async () => {
+    if (!resetTarget) return;
+    setBusy(true);
+    try {
+      await api.adminResetUserPassword(resetTarget.id, resetPassword);
+      toast({
+        title: "User password reset",
+        description: `${resetTarget.email} can now unlock with the new password.`,
+      });
+      setResetTarget(null);
+      setResetPassword("");
+    } catch (error) {
+      toast({
+        title: "Recovery reset failed",
+        description: error instanceof Error ? error.message : "Request failed",
+        variant: "destructive",
+      });
     } finally {
       setBusy(false);
     }
@@ -149,7 +176,7 @@ const Admin = () => {
             <Card>
               <CardHeader>
                 <CardTitle>User Management</CardTitle>
-                <CardDescription>Docker-local users and their 5GB quota usage.</CardDescription>
+                <CardDescription>Docker-local users, their 5GB quota usage, and vault recovery reset.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
                 {users.map((item) => (
@@ -160,7 +187,13 @@ const Admin = () => {
                         {formatBytes(item.used_bytes)} of {formatBytes(item.user_quota_bytes)}
                       </p>
                     </div>
-                    <Badge variant={item.role === "admin" ? "default" : "secondary"}>{item.role}</Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={item.role === "admin" ? "default" : "secondary"}>{item.role}</Badge>
+                      <Button variant="outline" onClick={() => setResetTarget(item)}>
+                        <KeyRound className="h-4 w-4" />
+                        Reset Unlock
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </CardContent>
@@ -219,6 +252,32 @@ const Admin = () => {
           </TabsContent>
         </Tabs>
       </div>
+
+      <Dialog open={!!resetTarget} onOpenChange={(open) => !open && setResetTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reset User Unlock Password</DialogTitle>
+            <DialogDescription>
+              This reassigns the user account password and vault unlock password through the Docker portal recovery key.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="rounded-md border p-3 text-sm text-muted-foreground">{resetTarget?.email}</div>
+            <div className="space-y-2">
+              <Label htmlFor="reset-password">New password</Label>
+              <Input id="reset-password" type="password" value={resetPassword} onChange={(event) => setResetPassword(event.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setResetTarget(null)}>
+              Cancel
+            </Button>
+            <Button onClick={resetUserPassword} disabled={busy || resetPassword.length < 8}>
+              Apply Reset
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -79,6 +79,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ email, password }),
     }),
+  changePassword: (currentPassword: string, newPassword: string) =>
+    request<{ ok: boolean }>("/api/auth/change-password", {
+      method: "POST",
+      body: JSON.stringify({ currentPassword, newPassword }),
+    }),
   me: () => request<{ user: ApiUser; quota: VaultQuota }>("/api/me"),
   vaults: () => request<{ vaults: Vault[]; quota: VaultQuota }>("/api/vaults"),
   listFiles: (vaultId: string, path = "/") =>
@@ -123,6 +128,11 @@ export const api = {
   clientDownloads: () => request<{ downloads: Array<{ platform: string; status: string; label: string; url: string | null }> }>("/api/client/downloads"),
   adminUsers: () =>
     request<{ users: Array<ApiUser & { used_bytes: string | number; user_quota_bytes: string | number }> }>("/api/admin/users"),
+  adminResetUserPassword: (userId: string, newPassword: string) =>
+    request<{ ok: boolean }>(`/api/admin/users/${encodeURIComponent(userId)}/reset-password`, {
+      method: "POST",
+      body: JSON.stringify({ newPassword }),
+    }),
   updateCheck: () => request<UpdateCheck>("/api/admin/system/update/check"),
   updateApply: () => request<UpdateStatus>("/api/admin/system/update/apply", { method: "POST" }),
   updateStatus: () => request<{ updater: UpdateStatus; history: UpdateHistory[] }>("/api/admin/system/update/status"),

@@ -41,7 +41,6 @@ export async function runMigrations() {
   for (const file of files) {
     const version = file.replace('.sql', '');
     const exists = await pool.query('SELECT 1 FROM schema_migrations WHERE version = $1', [version]);
-
     if (exists.rowCount) continue;
 
     const sql = await fs.readFile(path.join(migrationsDir, file), 'utf8');
