@@ -1,13 +1,23 @@
-import { useEffect } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { LogOut, Shield, UserCog } from "lucide-react";
 import { FileManager } from "@/components/FileManager";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { api } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 
 const Dashboard = () => {
   const { user, isAdmin, loading, logout } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) navigate("/auth");
@@ -22,6 +32,30 @@ const Dashboard = () => {
   }
 
   if (!user) return null;
+
+  const handleChangePassword = async (event: FormEvent) => {
+    event.preventDefault();
+    if (newPassword !== confirmPassword) {
+      toast({ title: "Password mismatch", description: "New password and confirm password must match.", variant: "destructive" });
+      return;
+    }
+    setChangingPassword(true);
+    try {
+      await api.changePassword(currentPassword, newPassword);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      toast({ title: "Password updated", description: "Your vault password and account password were updated." });
+    } catch (error) {
+      toast({
+        title: "Password change failed",
+        description: error instanceof Error ? error.message : "Request failed",
+        variant: "destructive",
+      });
+    } finally {
+      setChangingPassword(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -58,6 +92,51 @@ const Dashboard = () => {
       </header>
 
       <main className="container mx-auto px-6 py-8">
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle>Account Password</CardTitle>
+            <CardDescription>
+              Fresh Docker installs now seed the default admin account with password <code>password</code>. Change it here after the first login.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form className="grid gap-4 md:grid-cols-4" onSubmit={handleChangePassword}>
+              <div className="grid gap-2">
+                <Label htmlFor="current-password">Current password</Label>
+                <Input
+                  id="current-password"
+                  type="password"
+                  value={currentPassword}
+                  onChange={(event) => setCurrentPassword(event.target.value)}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="new-password">New password</Label>
+                <Input
+                  id="new-password"
+                  type="password"
+                  value={newPassword}
+                  onChange={(event) => setNewPassword(event.target.value)}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="confirm-password">Confirm new password</Label>
+                <Input
+                  id="confirm-password"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(event) => setConfirmPassword(event.target.value)}
+                />
+              </div>
+              <div className="flex items-end">
+                <Button type="submit" disabled={changingPassword || !currentPassword || !newPassword || !confirmPassword}>
+                  {changingPassword ? "Updating..." : "Change Password"}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+
         <FileManager />
       </main>
     </div>

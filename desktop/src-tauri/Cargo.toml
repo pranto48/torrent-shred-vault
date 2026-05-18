@@ -1,0 +1,30 @@
+[package]
+name = "torrent-shred-vault-desktop"
+version = "0.1.0"
+description = "A Tauri App"
+authors = ["you"]
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2.0.0", features = [] }
+
+[dependencies]
+tauri = { version = "2.0.0", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+notify = "6.1.1"
+reqwest = { version = "0.11", features = ["blocking", "json"] }
+tokio = { version = "1", features = ["full"] }
+anyhow = "1"
+chrono = { version = "0.4", features = ["clock", "serde"] }
+dirs = "5"
+keyring = "3"
+rusqlite = { version = "0.31", features = ["bundled"] }
+semver = "1"
+sha2 = "0.10"
+uuid = { version = "1", features = ["v4", "serde"] }
+rfd = "0.15"
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]

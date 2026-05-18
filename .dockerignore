@@ -6,3 +6,11 @@ npm-debug.log*
 .DS_Store
 .env
 .env.*
+desktop/node_modules
+desktop/dist
+desktop/src-tauri/target
+desktop/src-tauri/gen
+desktop/src-tauri/.tauri
+api/node_modules
+updater/node_modules
+backup/node_modules

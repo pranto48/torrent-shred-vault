@@ -1,0 +1,27 @@
+{
+  "productName": "Torrent Shred Vault Desktop",
+  "version": "0.1.0",
+  "identifier": "com.torrentshredvault.desktop",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "devUrl": "http://localhost:1420",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": [
+      {
+        "title": "Torrent Shred Vault Desktop",
+        "width": 1440,
+        "height": 920,
+        "minWidth": 1200,
+        "minHeight": 780,
+        "resizable": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  }
+}

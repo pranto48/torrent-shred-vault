@@ -37,6 +37,89 @@ export interface VaultItem {
   owner_email?: string;
 }
 
+export interface RaidShardSource {
+  device_id: string;
+  endpoint_url: string;
+  ticket: string;
+}
+
+export interface RaidShard {
+  shard_id: string;
+  shard_index: number;
+  shard_role: "data" | "parity";
+  size_bytes: string | number;
+  sha256: string;
+  sources: RaidShardSource[];
+}
+
+export interface RaidManifest {
+  manifest_id: string;
+  path: string;
+  root_kind: "user_vault" | "share_vault";
+  revision: number;
+  size_bytes: string | number;
+  shard_bytes: string | number;
+  status: "pending" | "protected" | "degraded" | "repairing";
+  quorum_count: number;
+  source_device_id: string;
+  shards: RaidShard[];
+}
+
+export interface RaidStatus {
+  reserveBytes: number;
+  reserveUsedBytes: number;
+  activeReservePeers: number;
+  summary: {
+    total: number;
+    protected: number;
+    degraded: number;
+    pending: number;
+  };
+  repairJobs: Record<string, number>;
+  manifests: RaidManifest[];
+}
+
+export interface AdminRaidStatus {
+  totals: {
+    reserveBytes: number;
+    reserveUsedBytes: number;
+    activeReservePeers: number;
+    manifests: number;
+    protected: number;
+    degraded: number;
+    pending: number;
+  };
+  users: Array<{
+    user: ApiUser;
+    status: RaidStatus;
+  }>;
+}
+
+export interface BackupRecord {
+  id: string;
+  fileName: string;
+  createdAt: string | null;
+  sizeBytes: number;
+  manifest: {
+    id?: string;
+    app?: string;
+    version?: number;
+    createdAt?: string;
+    dbName?: string;
+    contents?: string[];
+    excludes?: string[];
+  } | null;
+}
+
+export interface BackupStatus {
+  status: string;
+  message?: string;
+  backupId?: string;
+  updatedAt?: string;
+  error?: string;
+  logs?: string;
+}
+
 const TOKEN_KEY = "torrent-shred-vault-token";
 
 export function getToken() {
@@ -78,6 +161,11 @@ export const api = {
     request<{ token: string; user: ApiUser }>("/api/auth/register", {
       method: "POST",
       body: JSON.stringify({ email, password }),
+    }),
+  changePassword: (currentPassword: string, newPassword: string) =>
+    request<{ ok: boolean }>("/api/auth/change-password", {
+      method: "POST",
+      body: JSON.stringify({ currentPassword, newPassword }),
     }),
   me: () => request<{ user: ApiUser; quota: VaultQuota }>("/api/me"),
   vaults: () => request<{ vaults: Vault[]; quota: VaultQuota }>("/api/vaults"),
@@ -121,8 +209,39 @@ export const api = {
   },
   clientConfig: () => request<unknown>("/api/client/config"),
   clientDownloads: () => request<{ downloads: Array<{ platform: string; status: string; label: string; url: string | null }> }>("/api/client/downloads"),
+  raidStatus: () => request<RaidStatus>("/api/sync/raid/status"),
+  raidRepair: () => request<{ ok: boolean; result: unknown; status: RaidStatus }>("/api/sync/raid/repair", { method: "POST" }),
   adminUsers: () =>
     request<{ users: Array<ApiUser & { used_bytes: string | number; user_quota_bytes: string | number }> }>("/api/admin/users"),
+  adminResetUserPassword: (userId: string, newPassword: string) =>
+    request<{ ok: boolean }>(`/api/admin/users/${encodeURIComponent(userId)}/reset-password`, {
+      method: "POST",
+      body: JSON.stringify({ newPassword }),
+    }),
+  adminRaidStatus: () => request<AdminRaidStatus>("/api/admin/raid/status"),
+  adminRaidRepair: (userId?: string) =>
+    request<{ ok: boolean; users: Array<{ user: ApiUser; result: unknown; status: RaidStatus }> }>("/api/admin/raid/repair", {
+      method: "POST",
+      body: JSON.stringify(userId ? { userId } : {}),
+    }),
+  adminBackups: () => request<{ backups: BackupRecord[]; status: BackupStatus }>("/api/admin/backups"),
+  adminBackupStatus: () => request<BackupStatus>("/api/admin/backups/status"),
+  adminCreateBackup: () => request<{ backup: BackupRecord }>("/api/admin/backups/create", { method: "POST" }),
+  adminDownloadBackup: async (id: string) => {
+    const token = getToken();
+    const response = await fetch(`/api/admin/backups/${encodeURIComponent(id)}/download`, {
+      headers: token ? { authorization: `Bearer ${token}` } : {},
+    });
+    if (!response.ok) throw new Error((await response.json().catch(() => null))?.error ?? "Backup download failed");
+    return response.blob();
+  },
+  adminUploadBackup: (file: File) =>
+    request<{ backup: BackupRecord }>("/api/admin/backups/upload", {
+      method: "POST",
+      headers: { "content-type": file.type || "application/octet-stream" },
+      body: file,
+    }),
+  adminRestoreBackup: (id: string) => request<{ ok: boolean; backupId: string; restart?: unknown }>(`/api/admin/backups/${encodeURIComponent(id)}/restore`, { method: "POST" }),
   updateCheck: () => request<UpdateCheck>("/api/admin/system/update/check"),
   updateApply: () => request<UpdateStatus>("/api/admin/system/update/apply", { method: "POST" }),
   updateStatus: () => request<{ updater: UpdateStatus; history: UpdateHistory[] }>("/api/admin/system/update/status"),
