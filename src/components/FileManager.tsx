@@ -2,6 +2,7 @@ import { ChangeEvent, useEffect, useMemo, useState } from "react";
 import { Download, File, Folder, FolderPlus, HardDrive, RefreshCw, Share2, ShieldCheck, Trash2, Upload } from "lucide-react";
 import { api, formatBytes, RaidStatus, saveBlob, Vault, VaultItem, VaultQuota } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -122,6 +123,13 @@ export const FileManager = () => {
   };
 
   const downloadOwn = async (item: VaultItem) => {
+    if (item.storage_backend === "peer") {
+      toast({
+        title: "Peer Sync File",
+        description: "This file is stored in peer mode. Please download/sync it via your Torrent Shred Vault desktop client.",
+      });
+      return;
+    }
     if (!vaultPassword) {
       toast({ title: "Vault password required", description: "Enter your web account password before downloading.", variant: "destructive" });
       return;
@@ -134,6 +142,13 @@ export const FileManager = () => {
   };
 
   const downloadShared = async (item: VaultItem) => {
+    if (item.storage_backend === "peer") {
+      toast({
+        title: "Peer Sync File",
+        description: "This shared file is stored in peer mode. Please download/sync it via your Torrent Shred Vault desktop client.",
+      });
+      return;
+    }
     try {
       saveBlob(await api.downloadSharedFile(item), item.name);
     } catch (error) {
@@ -295,11 +310,16 @@ export const FileManager = () => {
                       >
                         {item.item_type === "folder" ? <Folder className="h-5 w-5 text-primary" /> : <File className="h-5 w-5 text-muted-foreground" />}
                         <span className="truncate font-medium">{item.name}</span>
+                        {item.item_type === "file" && item.storage_backend === "peer" && (
+                          <Badge variant="secondary" className="text-xs font-normal shrink-0">
+                            Peer Sync
+                          </Badge>
+                        )}
                       </button>
                       <span className="hidden text-sm text-muted-foreground sm:inline">{item.item_type === "file" ? formatBytes(item.size_bytes) : "Folder"}</span>
                       {item.item_type === "file" && (
-                        <Button variant="ghost" size="icon" onClick={() => downloadOwn(item)} title="Download">
-                          <Download className="h-4 w-4" />
+                        <Button variant="ghost" size="icon" onClick={() => downloadOwn(item)} title={item.storage_backend === "peer" ? "Peer Sync Only" : "Download"}>
+                          <Download className={`h-4 w-4 ${item.storage_backend === "peer" ? "opacity-40" : ""}`} />
                         </Button>
                       )}
                       <Button variant="ghost" size="icon" onClick={() => deleteItem(item)} title="Delete">
@@ -332,14 +352,21 @@ export const FileManager = () => {
                   <div className="flex min-w-0 flex-1 items-center gap-3">
                     {item.item_type === "folder" ? <Folder className="h-5 w-5 text-primary" /> : <File className="h-5 w-5 text-muted-foreground" />}
                     <div className="min-w-0">
-                      <p className="truncate font-medium">{item.name}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="truncate font-medium">{item.name}</p>
+                        {item.item_type === "file" && item.storage_backend === "peer" && (
+                          <Badge variant="secondary" className="text-xs font-normal shrink-0">
+                            Peer Sync
+                          </Badge>
+                        )}
+                      </div>
                       <p className="truncate text-xs text-muted-foreground">{item.owner_email}</p>
                     </div>
                   </div>
                   <span className="hidden text-sm text-muted-foreground sm:inline">{item.item_type === "file" ? formatBytes(item.size_bytes) : "Folder"}</span>
                   {item.item_type === "file" && (
-                    <Button variant="ghost" size="icon" onClick={() => downloadShared(item)} title="Download shared file">
-                      <Download className="h-4 w-4" />
+                    <Button variant="ghost" size="icon" onClick={() => downloadShared(item)} title={item.storage_backend === "peer" ? "Peer Sync Only" : "Download shared file"}>
+                      <Download className={`h-4 w-4 ${item.storage_backend === "peer" ? "opacity-40" : ""}`} />
                     </Button>
                   )}
                 </div>

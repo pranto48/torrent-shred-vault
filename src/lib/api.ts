@@ -32,6 +32,8 @@ export interface VaultItem {
   item_type: "file" | "folder";
   mime_type?: string | null;
   size_bytes: string | number;
+  storage_backend?: "server" | "peer";
+  source_device_id?: string | null;
   created_at: string;
   updated_at: string;
   owner_email?: string;

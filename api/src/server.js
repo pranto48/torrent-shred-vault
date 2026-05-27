@@ -1688,7 +1688,7 @@ app.get('/api/files', authenticate, authorize('user', 'admin'), async (req, res)
   if (!vault) return res.status(404).json({ error: 'Vault not found' });
 
   const items = await pool.query(
-    `SELECT id, vault_id, parent_path, path, name, item_type, mime_type, size_bytes, revision, content_sha256, created_at, updated_at
+    `SELECT id, vault_id, parent_path, path, name, item_type, mime_type, size_bytes, revision, content_sha256, storage_backend, source_device_id, created_at, updated_at
      FROM vault_items
      WHERE vault_id = $1 AND parent_path = $2
      ORDER BY item_type DESC, name ASC`,
@@ -1860,7 +1860,7 @@ app.get('/api/share/files', authenticate, authorize('user', 'admin'), async (req
   const path = normalizeDirPath(req.query.path ?? '/');
   const items = await pool.query(
     `SELECT i.id, i.vault_id, i.parent_path, i.path, i.name, i.item_type, i.mime_type, i.size_bytes,
-            i.revision, i.content_sha256, i.created_at, i.updated_at, u.email AS owner_email
+            i.revision, i.content_sha256, i.storage_backend, i.source_device_id, i.created_at, i.updated_at, u.email AS owner_email
      FROM vault_items i
      JOIN vaults v ON v.id = i.vault_id
      JOIN app_users u ON u.id = v.user_id
