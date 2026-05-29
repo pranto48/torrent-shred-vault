@@ -283,19 +283,21 @@ export const FileManager = () => {
                 <code className="rounded bg-muted px-3 py-2 text-sm">{currentPath}</code>
               </div>
 
-              <div className="grid gap-3 md:grid-cols-[1fr_auto_auto]">
+              <div className="flex flex-col gap-2 md:grid md:grid-cols-[1fr_auto_auto]">
                 <Input value={folderName} onChange={(event) => setFolderName(event.target.value)} placeholder="New folder name" />
-                <Button variant="outline" onClick={createFolder}>
-                  <FolderPlus className="h-4 w-4" />
-                  Folder
-                </Button>
-                <Button asChild disabled={uploading}>
-                  <label className="cursor-pointer">
-                    <Upload className="h-4 w-4" />
-                    {uploading ? "Uploading" : "Upload"}
-                    <input className="hidden" type="file" onChange={uploadFile} />
-                  </label>
-                </Button>
+                <div className="flex gap-2 md:contents">
+                  <Button variant="outline" onClick={createFolder} className="flex-1 md:flex-none">
+                    <FolderPlus className="h-4 w-4" />
+                    Folder
+                  </Button>
+                  <Button asChild disabled={uploading} className="flex-1 md:flex-none">
+                    <label className="cursor-pointer">
+                      <Upload className="h-4 w-4" />
+                      {uploading ? "Uploading" : "Upload"}
+                      <input className="hidden" type="file" onChange={uploadFile} />
+                    </label>
+                  </Button>
+                </div>
               </div>
 
               <div className="rounded-md border">

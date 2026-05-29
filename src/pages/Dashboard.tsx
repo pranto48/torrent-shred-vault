@@ -100,7 +100,7 @@ const Dashboard = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form className="grid gap-4 md:grid-cols-4" onSubmit={handleChangePassword}>
+            <form className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4" onSubmit={handleChangePassword}>
               <div className="grid gap-2">
                 <Label htmlFor="current-password">Current password</Label>
                 <Input

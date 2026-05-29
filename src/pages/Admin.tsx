@@ -265,7 +265,27 @@ const Admin = () => {
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[240px_1fr]">
-          <aside className="space-y-2">
+          {/* Mobile: horizontal scrollable pill nav */}
+          <nav className="flex gap-2 overflow-x-auto pb-1 lg:hidden" aria-label="Admin sections">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const active = section === item.id;
+              return (
+                <Button
+                  key={item.id}
+                  variant={active ? "default" : "outline"}
+                  size="sm"
+                  className="shrink-0 gap-1.5"
+                  onClick={() => setSection(item.id)}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {item.label}
+                </Button>
+              );
+            })}
+          </nav>
+          {/* Desktop: vertical sidebar */}
+          <aside className="hidden lg:flex lg:flex-col lg:space-y-2">
             {navItems.map((item) => {
               const Icon = item.icon;
               const active = section === item.id;
@@ -286,7 +306,7 @@ const Admin = () => {
           <main className="space-y-6">
             {section === "overview" && (
               <>
-                <div className="grid gap-4 md:grid-cols-4">
+                <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                       <CardTitle className="text-sm font-medium">Users</CardTitle>
@@ -392,7 +412,7 @@ const Admin = () => {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid gap-3 md:grid-cols-5">
+                  <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 md:grid-cols-5">
                     <div className="rounded-md border p-3">
                       <p className="text-sm text-muted-foreground">Reserve Used</p>
                       <p className="text-xl font-semibold">{formatBytes(raidStatus?.totals.reserveUsedBytes ?? 0)}</p>
