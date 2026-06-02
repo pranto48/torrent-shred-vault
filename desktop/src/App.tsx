@@ -26,9 +26,11 @@ type DesktopStatus = {
   transport_mode: string;
   peer_endpoint: string | null;
   peer_port: number;
+  peer_ip_override: string | null;
   bandwidth_limit_kbps: number;
   server_url: string | null;
   user_email: string | null;
+  device_id: string | null;
   base_dir: string | null;
   user_root: string | null;
   share_root: string | null;
@@ -82,6 +84,19 @@ type UpdateCheckResult = {
   notes: string | null;
 };
 
+type PeerDevice = {
+  deviceId: string;
+  deviceName: string;
+  platform: string;
+  peerEndpointUrl: string | null;
+  peerPort: number | null;
+  peerTransport: string;
+  reserveCapacityBytes: number;
+  reserveEnabled: boolean;
+  lastSeen: string;
+  isOnline: boolean;
+};
+
 const defaultServer = "http://192.168.20.5:4400";
 
 function App() {
@@ -97,6 +112,9 @@ function App() {
   const [message, setMessage] = useState("");
   const [summary, setSummary] = useState<SyncSummary | null>(null);
   const [updateInfo, setUpdateInfo] = useState<UpdateCheckResult | null>(null);
+  const [peerIpOverride, setPeerIpOverride] = useState("");
+  const [peerPort, setPeerPort] = useState("44888");
+  const [peerDevices, setPeerDevices] = useState<PeerDevice[]>([]);
 
   useEffect(() => {
     void refreshStatus();
@@ -104,8 +122,10 @@ function App() {
 
   useEffect(() => {
     if (!status?.authenticated) return;
+    void refreshPeerDevices();
     const timer = window.setInterval(() => {
       void refreshStatus();
+      void refreshPeerDevices();
     }, 2500);
     return () => window.clearInterval(timer);
   }, [status?.authenticated]);
@@ -124,8 +144,19 @@ function App() {
       if (nextStatus.base_dir) setBaseDir(nextStatus.base_dir);
       setRememberPassword(nextStatus.remember_password);
       setBandwidthLimit(String(nextStatus.bandwidth_limit_kbps ?? 0));
+      setPeerIpOverride(nextStatus.peer_ip_override ?? "");
+      setPeerPort(String(nextStatus.peer_port ?? 44888));
     } catch (error) {
       setMessage(String(error));
+    }
+  }
+
+  async function refreshPeerDevices() {
+    try {
+      const peers = await invoke<PeerDevice[]>("get_peer_devices");
+      setPeerDevices(peers);
+    } catch (error) {
+      console.error("Failed to load peer devices", error);
     }
   }
 
@@ -285,6 +316,39 @@ function App() {
     try {
       await invoke("open_log_folder");
       setMessage("Opened desktop log folder.");
+    } catch (error) {
+      setMessage(String(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleSavePeerSettings() {
+    setBusy(true);
+    setMessage("");
+    try {
+      let nextStatus = await invoke<DesktopStatus>("set_peer_ip_override", { ipOverride: peerIpOverride });
+      const portNum = Math.max(1024, Math.min(65535, Number.parseInt(peerPort, 10) || 44888));
+      nextStatus = await invoke<DesktopStatus>("set_peer_port", { peerPort: portNum });
+      setStatus(nextStatus);
+      setPeerIpOverride(nextStatus.peer_ip_override ?? "");
+      setPeerPort(String(nextStatus.peer_port));
+      setMessage("Peer connection settings updated and re-registered.");
+      void refreshPeerDevices();
+    } catch (error) {
+      setMessage(String(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleRaidRepair() {
+    setBusy(true);
+    setMessage("");
+    try {
+      const nextStatus = await invoke<DesktopStatus>("trigger_raid_repair");
+      setStatus(nextStatus);
+      setMessage("RAID repair and rebalance job triggered on the swarm.");
     } catch (error) {
       setMessage(String(error));
     } finally {
@@ -601,6 +665,82 @@ function App() {
           </div>
         </section>
 
+        {status?.authenticated && (
+          <section className="grid-two">
+            <article className="panel">
+              <div className="panel-header">
+                <h2>Connection Settings</h2>
+                <p>Configure local listener port and optional IP override for VPN or LAN.</p>
+              </div>
+              <div className="stack">
+                <label>
+                  <span>VPN or LAN IP Override (Optional)</span>
+                  <input
+                    type="text"
+                    value={peerIpOverride}
+                    onChange={(event) => setPeerIpOverride(event.target.value)}
+                    placeholder="e.g. 10.8.0.2 or 192.168.1.50"
+                  />
+                  <span className="subtle-note">
+                    Leave blank to autodetect IP interface routing to the server.
+                  </span>
+                </label>
+                <label>
+                  <span>Peer Seeding Port</span>
+                  <input
+                    type="number"
+                    min="1024"
+                    max="65535"
+                    value={peerPort}
+                    onChange={(event) => setPeerPort(event.target.value)}
+                    placeholder="44888"
+                  />
+                </label>
+                <button type="button" className="primary" onClick={() => void handleSavePeerSettings()} disabled={busy}>
+                  Save Peer Settings
+                </button>
+              </div>
+            </article>
+
+            <article className="panel">
+              <div className="panel-header">
+                <h2>Active Swarm Peers</h2>
+                <p>Devices registered on the same user account.</p>
+              </div>
+              <div className="list-shell swarm-list">
+                {peerDevices.length ? (
+                  peerDevices.map((device) => {
+                    const isSelf = device.deviceId === status.device_id;
+                    return (
+                      <div key={device.deviceId} className={`peer-card ${isSelf ? "self-peer" : ""}`}>
+                        <div className="peer-top">
+                          <div>
+                            <strong>
+                              {device.deviceName} {isSelf && <span className="self-badge">(You)</span>}
+                            </strong>
+                            <p className="device-id">{device.deviceId}</p>
+                          </div>
+                          <span className={`status-badge ${device.isOnline ? "online" : "offline"}`}>
+                            {device.isOnline ? "Online" : "Offline"}
+                          </span>
+                        </div>
+                        <div className="peer-meta">
+                          <span>IP Endpoint: {device.peerEndpointUrl ?? "No IP registered"}</span>
+                          <span>Platform: {device.platform}</span>
+                          <span>Transport: {device.peerTransport}</span>
+                          <span>Reserve Capacity: {Math.round(device.reserveCapacityBytes / (1024 * 1024 * 1024))} GB ({device.reserveEnabled ? "Enabled" : "Disabled"})</span>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <p className="empty-state">No peers found in swarm.</p>
+                )}
+              </div>
+            </article>
+          </section>
+        )}
+
         <section className="grid-two">
           <article className="panel drive-panel">
             <div className="panel-header">
@@ -643,6 +783,9 @@ function App() {
                 <strong>{status?.raid_pending_jobs ?? 0}</strong>
               </div>
             </div>
+            <button type="button" className="primary" onClick={() => void handleRaidRepair()} disabled={busy}>
+              Trigger RAID Repair & Rebalance
+            </button>
             <p className="subtle-note">Two reserve shards on different peers are required for healthy private-vault protection.</p>
           </article>
         </section>

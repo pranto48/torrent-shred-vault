@@ -98,9 +98,11 @@ struct DesktopStatus {
     transport_mode: String,
     peer_endpoint: Option<String>,
     peer_port: u16,
+    peer_ip_override: Option<String>,
     bandwidth_limit_kbps: i64,
     server_url: Option<String>,
     user_email: Option<String>,
+    device_id: Option<String>,
     base_dir: Option<String>,
     user_root: Option<String>,
     share_root: Option<String>,
@@ -221,6 +223,34 @@ struct RaidBootstrapConfig {
     quorum_shards: usize,
     #[serde(rename = "reserveBytes", default = "default_raid_reserve_bytes")]
     reserve_bytes: i64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct ServerPeerDevice {
+    #[serde(rename = "deviceId")]
+    device_id: String,
+    #[serde(rename = "deviceName")]
+    device_name: String,
+    platform: String,
+    #[serde(rename = "peerEndpointUrl")]
+    peer_endpoint_url: Option<String>,
+    #[serde(rename = "peerPort")]
+    peer_port: Option<i32>,
+    #[serde(rename = "peerTransport")]
+    peer_transport: String,
+    #[serde(rename = "reserveCapacityBytes")]
+    reserve_capacity_bytes: i64,
+    #[serde(rename = "reserveEnabled")]
+    reserve_enabled: bool,
+    #[serde(rename = "lastSeen")]
+    last_seen: String,
+    #[serde(rename = "isOnline")]
+    is_online: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct ServerPeerDevicesResponse {
+    devices: Vec<ServerPeerDevice>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -851,6 +881,7 @@ fn current_status(state: &AppState) -> Result<DesktopStatus> {
     let transport_mode = get_transport_mode(&conn)?;
     let peer_endpoint = get_setting(&conn, "peer_endpoint")?;
     let peer_port = get_peer_port(&conn)?;
+    let peer_ip_override = get_setting(&conn, "peer_ip_override")?;
     let bandwidth_limit_kbps = get_bandwidth_limit_kbps(&conn)?;
     let remember_password = get_bool_setting(&conn, "remember_password")?;
     let startup_enabled = is_startup_enabled();
@@ -931,9 +962,11 @@ fn current_status(state: &AppState) -> Result<DesktopStatus> {
         transport_mode,
         peer_endpoint,
         peer_port,
+        peer_ip_override,
         bandwidth_limit_kbps,
         server_url,
         user_email,
+        device_id,
         base_dir,
         user_root,
         share_root,
@@ -1222,8 +1255,15 @@ fn register_peer_endpoint(state: &AppState, config: &RuntimeConfig) -> Result<Op
     if config.transport_mode != "peer" {
         return Ok(None);
     }
-    let Some(endpoint_url) = detect_peer_endpoint(&config.server_url, config.peer_port).or_else(|| config.peer_endpoint.clone()) else {
-        return Ok(None);
+    let conn = state.connect()?;
+    let ip_override = get_setting(&conn, "peer_ip_override")?;
+    let endpoint_url = if let Some(ip) = ip_override.filter(|s| !s.trim().is_empty()) {
+        format!("http://{}:{}", ip.trim(), config.peer_port)
+    } else {
+        let Some(detected) = detect_peer_endpoint(&config.server_url, config.peer_port).or_else(|| config.peer_endpoint.clone()) else {
+            return Ok(None);
+        };
+        detected
     };
     let client = auth_client()?;
     let response = client
@@ -3037,6 +3077,78 @@ fn clear_session(state: State<'_, AppState>) -> Result<DesktopStatus, String> {
 }
 
 #[tauri::command]
+fn set_peer_ip_override(state: State<'_, AppState>, ip_override: String) -> Result<DesktopStatus, String> {
+    let conn = state.connect().map_err(|error| error.to_string())?;
+    set_setting(&conn, "peer_ip_override", &ip_override).map_err(|error| error.to_string())?;
+    log_activity(&state, "info", &format!("Desktop peer IP override set to: {}", ip_override))
+        .map_err(|error| error.to_string())?;
+    if let Some(config) = load_runtime_config(&state).map_err(|error| error.to_string())? {
+        let _ = register_peer_endpoint(&state, &config);
+    }
+    current_status(&state).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn set_peer_port(state: State<'_, AppState>, peer_port: u16) -> Result<DesktopStatus, String> {
+    let conn = state.connect().map_err(|error| error.to_string())?;
+    set_setting(&conn, "peer_port", &peer_port.to_string()).map_err(|error| error.to_string())?;
+    log_activity(&state, "info", &format!("Desktop peer port set to: {}", peer_port))
+        .map_err(|error| error.to_string())?;
+    if let Some(config) = load_runtime_config(&state).map_err(|error| error.to_string())? {
+        let _ = register_peer_endpoint(&state, &config);
+    }
+    current_status(&state).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn get_peer_devices(state: State<'_, AppState>) -> Result<Vec<ServerPeerDevice>, String> {
+    let Some(config) = load_runtime_config(&state).map_err(|error| error.to_string())? else {
+        return Ok(Vec::new());
+    };
+    let client = auth_client().map_err(|error| error.to_string())?;
+    let response = client
+        .get(format!("{}/api/sync/devices", config.server_url))
+        .bearer_auth(&config.token)
+        .send()
+        .context("failed to request peer devices")
+        .map_err(|error| error.to_string())?;
+    if !response.status().is_success() {
+        let body = response.text().unwrap_or_else(|_| "failed to fetch peers".to_string());
+        return Err(body);
+    }
+    let payload: ServerPeerDevicesResponse = decode_json(response).map_err(|error| error.to_string())?;
+    Ok(payload.devices)
+}
+
+#[tauri::command]
+fn trigger_raid_repair(state: State<'_, AppState>) -> Result<DesktopStatus, String> {
+    let Some(config) = load_runtime_config(&state).map_err(|error| error.to_string())? else {
+        return Err("Desktop sync client is not configured".to_string());
+    };
+    let client = auth_client().map_err(|error| error.to_string())?;
+    let response = client
+        .post(format!("{}/api/sync/raid/repair", config.server_url))
+        .bearer_auth(&config.token)
+        .query(&[("deviceId", config.device_id.clone())])
+        .send()
+        .context("failed to trigger RAID repair")
+        .map_err(|error| error.to_string())?;
+    if !response.status().is_success() {
+        let body = response.text().unwrap_or_else(|_| "failed to run RAID repair".to_string());
+        return Err(body);
+    }
+    
+    #[derive(Debug, Deserialize)]
+    struct RepairResponse {
+        status: RaidStatusResponse,
+    }
+    let payload: RepairResponse = decode_json(response).map_err(|error| error.to_string())?;
+    cache_raid_status(&state, &payload.status).map_err(|error| error.to_string())?;
+    log_activity(&state, "info", "RAID repair/rebalance triggered manually").map_err(|error| error.to_string())?;
+    current_status(&state).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
 fn open_log_folder() -> Result<(), String> {
     let dir = logs_dir();
     fs::create_dir_all(&dir).map_err(|error| error.to_string())?;
@@ -3141,7 +3253,11 @@ fn run_inner() -> Result<()> {
             quit_desktop_app,
             clear_session,
             open_log_folder,
-            reset_local_sync_state
+            reset_local_sync_state,
+            set_peer_ip_override,
+            set_peer_port,
+            get_peer_devices,
+            trigger_raid_repair
         ])
         .setup(|app| {
             let state = app.state::<AppState>();

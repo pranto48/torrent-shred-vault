@@ -1944,6 +1944,44 @@ app.get('/api/client/downloads', authenticate, authorize('user', 'admin'), (_req
   });
 });
 
+app.get('/api/sync/devices', authenticate, authorize('user', 'admin'), async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await refreshRaidHealthForUser(client, req.user.sub);
+    const result = await client.query(
+      `SELECT device_id, device_name, platform, peer_endpoint_url, peer_port, peer_transport, 
+              reserve_capacity_bytes, reserve_enabled, updated_at,
+              COALESCE(peer_last_seen_at, updated_at) AS last_seen
+       FROM sync_devices
+       WHERE user_id = $1
+       ORDER BY last_seen DESC`,
+      [req.user.sub]
+    );
+    await client.query('COMMIT');
+    res.json({
+      devices: result.rows.map(row => ({
+        deviceId: row.device_id,
+        deviceName: row.device_name ?? 'Unknown Device',
+        platform: row.platform ?? 'unknown',
+        peerEndpointUrl: row.peer_endpoint_url,
+        peerPort: row.peer_port == null ? null : Number(row.peer_port),
+        peerTransport: row.peer_transport,
+        reserveCapacityBytes: Number(row.reserve_capacity_bytes ?? 0),
+        reserveEnabled: !!row.reserve_enabled,
+        lastSeen: row.last_seen,
+        isOnline: (new Date() - new Date(row.last_seen)) < (PEER_SOURCE_TTL_SECONDS * 1000)
+      }))
+    });
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch sync devices' });
+  } finally {
+    client.release();
+  }
+});
+
 app.get('/api/sync/bootstrap', authenticate, authorize('user', 'admin'), async (req, res) => {
   const deviceId = sanitizeDeviceId(req.query.deviceId);
   if (!deviceId) return res.status(400).json({ error: 'deviceId required' });
