@@ -473,3 +473,105 @@ label span {
     grid-template-columns: 1fr;
   }
 }
+
+/* OpenVPN Status, Alert, and Configurator Styles */
+.code-textarea {
+  width: 100%;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  background: #090d16;
+  color: #a7f3d0;
+  padding: 0.8rem;
+  font-family: "Cascadia Mono", "Consolas", monospace;
+  font-size: 0.82rem;
+  resize: vertical;
+  line-height: 1.4;
+}
+
+.code-textarea:focus {
+  outline: none;
+  border-color: #22c55e;
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.2);
+}
+
+.status-badge.warning-status {
+  background: rgba(234, 179, 8, 0.15);
+  color: #eab308;
+}
+
+.status-badge.warning-status::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #eab308;
+  box-shadow: 0 0 8px #eab308;
+  animation: pulse-orange 1.6s infinite;
+}
+
+@keyframes pulse-orange {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(234, 179, 8, 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 6px rgba(234, 179, 8, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(234, 179, 8, 0);
+  }
+}
+
+.alert-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 1.25rem;
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
+.alert-banner.warning {
+  background: rgba(234, 179, 8, 0.08);
+  border: 1px solid rgba(234, 179, 8, 0.3);
+  color: #fef08a;
+}
+
+.alert-banner.warning strong {
+  color: #facc15;
+}
+
+.alert-icon {
+  font-size: 1.2rem;
+  user-select: none;
+}
+
+.text-warning {
+  color: #eab308;
+}
+
+/* Specific buttons */
+button.danger-button {
+  background: #991b1b;
+  border-color: #b91c1c;
+}
+
+button.danger-button:hover:not(:disabled) {
+  background: #b91c1c;
+  border-color: #dc2626;
+}
+
+button.success-button {
+  background: #166534;
+  border-color: #15803d;
+}
+
+button.success-button:hover:not(:disabled) {
+  background: #15803d;
+  border-color: #16a34a;
+}

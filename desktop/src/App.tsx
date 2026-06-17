@@ -27,6 +27,8 @@ type DesktopStatus = {
   peer_endpoint: string | null;
   peer_port: number;
   peer_ip_override: string | null;
+  vpn_enabled: boolean;
+  vpn_status: string;
   bandwidth_limit_kbps: number;
   server_url: string | null;
   user_email: string | null;
@@ -115,6 +117,17 @@ function App() {
   const [peerIpOverride, setPeerIpOverride] = useState("");
   const [peerPort, setPeerPort] = useState("44888");
   const [peerDevices, setPeerDevices] = useState<PeerDevice[]>([]);
+  const [vpnUsername, setVpnUsername] = useState("");
+  const [vpnPassword, setVpnPassword] = useState("");
+  const [vpnConfigText, setVpnConfigText] = useState("");
+  const [vpnRequire, setVpnRequire] = useState(false);
+  const [vpnDetails, setVpnDetails] = useState<{
+    enabled: boolean;
+    configured: boolean;
+    status: string;
+    config_path: string | null;
+    username: string | null;
+  } | null>(null);
 
   useEffect(() => {
     void refreshStatus();
@@ -123,9 +136,11 @@ function App() {
   useEffect(() => {
     if (!status?.authenticated) return;
     void refreshPeerDevices();
+    void refreshVpnDetails();
     const timer = window.setInterval(() => {
       void refreshStatus();
       void refreshPeerDevices();
+      void refreshVpnDetails();
     }, 2500);
     return () => window.clearInterval(timer);
   }, [status?.authenticated]);
@@ -134,6 +149,10 @@ function App() {
     if (!message) return false;
     return message.toLowerCase().includes("password");
   }, [message]);
+
+  const isSyncLocked = useMemo(() => {
+    return !!(status?.vpn_enabled && status?.vpn_status !== "Connected");
+  }, [status?.vpn_enabled, status?.vpn_status]);
 
   async function refreshStatus() {
     try {
@@ -157,6 +176,74 @@ function App() {
       setPeerDevices(peers);
     } catch (error) {
       console.error("Failed to load peer devices", error);
+    }
+  }
+
+  async function refreshVpnDetails() {
+    try {
+      const details = await invoke<{
+        enabled: boolean;
+        configured: boolean;
+        status: string;
+        config_path: string | null;
+        username: string | null;
+      }>("get_vpn_status");
+      setVpnDetails(details);
+      setVpnRequire(details.enabled);
+      if (details.username) setVpnUsername(details.username);
+    } catch (error) {
+      console.error("Failed to load VPN status details", error);
+    }
+  }
+
+  async function handleSaveVpnConfig() {
+    setBusy(true);
+    setMessage("");
+    try {
+      const nextStatus = await invoke<DesktopStatus>("save_vpn_config", {
+        configContent: vpnConfigText,
+        username: vpnUsername || null,
+        password: vpnPassword || null,
+        enabled: vpnRequire,
+      });
+      setStatus(nextStatus);
+      setMessage("OpenVPN configuration saved.");
+      setVpnConfigText("");
+      await refreshVpnDetails();
+    } catch (error) {
+      setMessage(String(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleConnectVpn() {
+    setBusy(true);
+    setMessage("");
+    try {
+      const nextStatus = await invoke<DesktopStatus>("connect_vpn");
+      setStatus(nextStatus);
+      setMessage("OpenVPN connection process spawned.");
+      await refreshVpnDetails();
+    } catch (error) {
+      setMessage(String(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleDisconnectVpn() {
+    setBusy(true);
+    setMessage("");
+    try {
+      const nextStatus = await invoke<DesktopStatus>("disconnect_vpn");
+      setStatus(nextStatus);
+      setMessage("OpenVPN process terminated.");
+      await refreshVpnDetails();
+    } catch (error) {
+      setMessage(String(error));
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -469,7 +556,9 @@ function App() {
               </div>
               <div className="stat-card">
                 <span className="stat-label">Mode</span>
-                <strong>{status.sync_enabled ? "Running" : "Paused"}</strong>
+                <strong className={isSyncLocked ? "text-warning" : ""}>
+                  {isSyncLocked ? "Locked" : status.sync_enabled ? "Running" : "Paused"}
+                </strong>
               </div>
             </div>
 
@@ -520,7 +609,7 @@ function App() {
               <button type="button" onClick={() => void handleSaveBandwidthLimit()} disabled={busy}>
                 Save Bandwidth Limit
               </button>
-              <button type="button" className="primary" onClick={() => void handleSyncNow()} disabled={busy}>
+              <button type="button" className="primary" onClick={() => void handleSyncNow()} disabled={busy || isSyncLocked}>
                 Sync Now
               </button>
               <button type="button" onClick={() => void handleToggleSync(!status.sync_enabled)} disabled={busy}>
@@ -603,6 +692,15 @@ function App() {
           {message ? <p className="message">{message}</p> : null}
         </header>
 
+        {isSyncLocked && (
+          <div className="alert-banner warning">
+            <span className="alert-icon">⚠️</span>
+            <div className="alert-content">
+              <strong>Sync Locked:</strong> OpenVPN connection is required but disconnected. Connect to resume file syncing.
+            </div>
+          </div>
+        )}
+
         <section className="stat-grid">
           <div className="stat-card">
             <span className="stat-label">Uploads</span>
@@ -667,47 +765,139 @@ function App() {
 
         {status?.authenticated && (
           <section className="grid-two">
-            <article className="panel">
-              <div className="panel-header">
-                <h2>Connection Settings</h2>
-                <p>Configure local listener port and optional IP override for VPN or LAN.</p>
-              </div>
-              <div className="stack">
-                <label>
-                  <span>VPN or LAN IP Override (Optional)</span>
-                  <input
-                    type="text"
-                    value={peerIpOverride}
-                    onChange={(event) => setPeerIpOverride(event.target.value)}
-                    placeholder="e.g. 10.8.0.2 or 192.168.1.50"
-                  />
-                  <span className="subtle-note">
-                    Leave blank to autodetect IP interface routing to the server.
-                  </span>
-                </label>
-                <label>
-                  <span>Peer Seeding Port</span>
-                  <input
-                    type="number"
-                    min="1024"
-                    max="65535"
-                    value={peerPort}
-                    onChange={(event) => setPeerPort(event.target.value)}
-                    placeholder="44888"
-                  />
-                </label>
-                <button type="button" className="primary" onClick={() => void handleSavePeerSettings()} disabled={busy}>
-                  Save Peer Settings
-                </button>
-              </div>
-            </article>
+            <div className="stack" style={{ gap: "1rem" }}>
+              <article className="panel">
+                <div className="panel-header">
+                  <h2>Connection Settings</h2>
+                  <p>Configure local listener port and optional IP override for VPN or LAN.</p>
+                </div>
+                <div className="stack">
+                  <label>
+                    <span>VPN or LAN IP Override (Optional)</span>
+                    <input
+                      type="text"
+                      value={peerIpOverride}
+                      onChange={(event) => setPeerIpOverride(event.target.value)}
+                      placeholder="e.g. 10.8.0.2 or 192.168.1.50"
+                    />
+                    <span className="subtle-note">
+                      Leave blank to autodetect IP interface routing to the server.
+                    </span>
+                  </label>
+                  <label>
+                    <span>Peer Seeding Port</span>
+                    <input
+                      type="number"
+                      min="1024"
+                      max="65535"
+                      value={peerPort}
+                      onChange={(event) => setPeerPort(event.target.value)}
+                      placeholder="44888"
+                    />
+                  </label>
+                  <button type="button" className="primary" onClick={() => void handleSavePeerSettings()} disabled={busy}>
+                    Save Peer Settings
+                  </button>
+                </div>
+              </article>
+
+              <article className="panel">
+                <div className="panel-header">
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <h2>OpenVPN Configurator</h2>
+                    <span className={`status-badge vpn-badge ${
+                      vpnDetails?.status.toLowerCase() === "connected" ? "online" :
+                      vpnDetails?.status.toLowerCase() === "connecting" ? "warning-status" : "offline"
+                    }`}>
+                      {vpnDetails?.status ?? "Disconnected"}
+                    </span>
+                  </div>
+                  <p>Configure and manage the VPN connection required for secure sync routing.</p>
+                </div>
+                <div className="stack">
+                  <label>
+                    <span>OpenVPN Config File (.ovpn) Content</span>
+                    <textarea
+                      rows={6}
+                      value={vpnConfigText}
+                      onChange={(e) => setVpnConfigText(e.target.value)}
+                      placeholder="Paste your .ovpn configuration text here..."
+                      className="code-textarea"
+                    />
+                  </label>
+                  <div className="button-row">
+                    <label>
+                      <span>Username (Optional)</span>
+                      <input
+                        type="text"
+                        value={vpnUsername}
+                        onChange={(e) => setVpnUsername(e.target.value)}
+                        placeholder="vpn_user"
+                      />
+                    </label>
+                    <label>
+                      <span>Password (Optional)</span>
+                      <input
+                        type="password"
+                        value={vpnPassword}
+                        onChange={(e) => setVpnPassword(e.target.value)}
+                        placeholder="vpn_password"
+                      />
+                    </label>
+                  </div>
+                  <label className="checkbox">
+                    <input
+                      type="checkbox"
+                      checked={vpnRequire}
+                      onChange={(e) => setVpnRequire(e.target.checked)}
+                    />
+                    <span>Require OpenVPN connection for file syncing</span>
+                  </label>
+                  <div className="button-row">
+                    <button
+                      type="button"
+                      className="primary"
+                      onClick={() => void handleSaveVpnConfig()}
+                      disabled={busy}
+                    >
+                      Save Config
+                    </button>
+                    {vpnDetails?.configured ? (
+                      vpnDetails.status === "Connected" || vpnDetails.status === "Connecting" ? (
+                        <button
+                          type="button"
+                          className="danger-button"
+                          onClick={() => void handleDisconnectVpn()}
+                          disabled={busy}
+                        >
+                          Disconnect
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="success-button"
+                          onClick={() => void handleConnectVpn()}
+                          disabled={busy}
+                        >
+                          Connect
+                        </button>
+                      )
+                    ) : (
+                      <button type="button" disabled>
+                        Not Configured
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </article>
+            </div>
 
             <article className="panel">
               <div className="panel-header">
                 <h2>Active Swarm Peers</h2>
                 <p>Devices registered on the same user account.</p>
               </div>
-              <div className="list-shell swarm-list">
+              <div className="list-shell swarm-list" style={{ maxHeight: "680px" }}>
                 {peerDevices.length ? (
                   peerDevices.map((device) => {
                     const isSelf = device.deviceId === status.device_id;

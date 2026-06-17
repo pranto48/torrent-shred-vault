@@ -18,8 +18,11 @@ use std::{
     thread,
     time::{Duration, Instant},
 };
+use std::process::Child;
 use tauri::{AppHandle, Manager, State, WindowEvent};
 use uuid::Uuid;
+
+static VPN_CHILD_PROCESS: Mutex<Option<Child>> = Mutex::new(None);
 
 const SERVICE_NAME: &str = "torrent-shred-vault-desktop";
 const SETTINGS_TRUE: &str = "true";
@@ -99,6 +102,8 @@ struct DesktopStatus {
     peer_endpoint: Option<String>,
     peer_port: u16,
     peer_ip_override: Option<String>,
+    vpn_enabled: bool,
+    vpn_status: String,
     bandwidth_limit_kbps: i64,
     server_url: Option<String>,
     user_email: Option<String>,
@@ -866,12 +871,63 @@ pub(crate) fn is_suppressed(state: &AppState, path: &Path) -> bool {
     }
 }
 
+fn is_openvpn_connected() -> bool {
+    #[cfg(target_os = "windows")]
+    {
+        if let Ok(output) = std::process::Command::new("powershell")
+            .args([
+                "-Command",
+                "Get-NetAdapter | Where-Object { $_.InterfaceDescription -like '*TAP*' -or $_.InterfaceDescription -like '*TUN*' -or $_.InterfaceDescription -like '*OpenVPN*' -or $_.Name -like '*OpenVPN*' -or $_.Name -like '*TAP*' } | Where-Object { $_.Status -eq 'Up' }"
+            ])
+            .output() {
+            let list = String::from_utf8_lossy(&output.stdout);
+            if !list.trim().is_empty() {
+                return true;
+            }
+        }
+        if let Ok(output) = std::process::Command::new("ipconfig").output() {
+            let list = String::from_utf8_lossy(&output.stdout);
+            if list.contains("10.8.") {
+                return true;
+            }
+        }
+        false
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        if let Ok(output) = std::process::Command::new("ifconfig").output() {
+            let ifaces = String::from_utf8_lossy(&output.stdout);
+            ifaces.contains("tun") || ifaces.contains("tap") || ifaces.contains("utun")
+        } else {
+            false
+        }
+    }
+}
+
+fn find_openvpn_binary() -> Option<PathBuf> {
+    if std::process::Command::new("openvpn").arg("--version").stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null()).status().is_ok() {
+        return Some(PathBuf::from("openvpn"));
+    }
+    let paths = [
+        "C:\\Program Files\\OpenVPN\\bin\\openvpn.exe",
+        "C:\\Program Files (x86)\\OpenVPN\\bin\\openvpn.exe",
+    ];
+    for p in paths {
+        let path = PathBuf::from(p);
+        if path.is_file() {
+            return Some(path);
+        }
+    }
+    None
+}
+
 fn current_status(state: &AppState) -> Result<DesktopStatus> {
     let conn = state.connect()?;
     let configured = get_setting(&conn, "server_url")?.is_some();
     let authenticated = get_setting(&conn, "auth_token")?.is_some();
     let server_url = get_setting(&conn, "server_url")?;
     let user_email = get_setting(&conn, "user_email")?;
+    let device_id = get_setting(&conn, "device_id")?;
     let base_dir = get_setting(&conn, "base_dir")?;
     let user_root = get_setting(&conn, "user_root")?;
     let share_root = get_setting(&conn, "share_root")?;
@@ -882,6 +938,23 @@ fn current_status(state: &AppState) -> Result<DesktopStatus> {
     let peer_endpoint = get_setting(&conn, "peer_endpoint")?;
     let peer_port = get_peer_port(&conn)?;
     let peer_ip_override = get_setting(&conn, "peer_ip_override")?;
+    let vpn_enabled = get_bool_setting(&conn, "vpn_enabled").unwrap_or(false);
+    let vpn_status = if is_openvpn_connected() {
+        "Connected".to_string()
+    } else {
+        if let Ok(mut handle) = VPN_CHILD_PROCESS.lock() {
+            if let Some(ref mut child) = *handle {
+                match child.try_wait() {
+                    Ok(None) => "Connecting".to_string(),
+                    _ => "Disconnected".to_string(),
+                }
+            } else {
+                "Disconnected".to_string()
+            }
+        } else {
+            "Disconnected".to_string()
+        }
+    };
     let bandwidth_limit_kbps = get_bandwidth_limit_kbps(&conn)?;
     let remember_password = get_bool_setting(&conn, "remember_password")?;
     let startup_enabled = is_startup_enabled();
@@ -963,6 +1036,8 @@ fn current_status(state: &AppState) -> Result<DesktopStatus> {
         peer_endpoint,
         peer_port,
         peer_ip_override,
+        vpn_enabled,
+        vpn_status,
         bandwidth_limit_kbps,
         server_url,
         user_email,
@@ -2506,6 +2581,12 @@ pub(crate) fn perform_sync_cycle(state: &AppState) -> Result<SyncSummary> {
     if !config.sync_enabled {
         return Ok(SyncSummary::default());
     }
+    let conn = state.connect()?;
+    let vpn_enabled = get_bool_setting(&conn, "vpn_enabled").unwrap_or(false);
+    if vpn_enabled && !is_openvpn_connected() {
+        log_activity(state, "warn", "Background sync paused: OpenVPN connection is required but disconnected.")?;
+        return Ok(SyncSummary::default());
+    }
     if config.transport_mode == "peer" {
         let _ = register_peer_endpoint(state, &config);
     }
@@ -3148,6 +3229,166 @@ fn trigger_raid_repair(state: State<'_, AppState>) -> Result<DesktopStatus, Stri
     current_status(&state).map_err(|error| error.to_string())
 }
 
+#[derive(Debug, Serialize)]
+struct VpnStatus {
+    enabled: bool,
+    configured: bool,
+    status: String,
+    config_path: Option<String>,
+    username: Option<String>,
+}
+
+#[tauri::command]
+fn get_vpn_status(state: State<'_, AppState>) -> Result<VpnStatus, String> {
+    let conn = state.connect().map_err(|error| error.to_string())?;
+    let enabled = get_bool_setting(&conn, "vpn_enabled").unwrap_or(false);
+    let config_path = get_setting(&conn, "vpn_config_path").map_err(|error| error.to_string())?;
+    let username = get_setting(&conn, "vpn_username").map_err(|error| error.to_string())?;
+    let configured = config_path.is_some();
+    
+    let status = if is_openvpn_connected() {
+        "Connected".to_string()
+    } else {
+        if let Ok(mut handle) = VPN_CHILD_PROCESS.lock() {
+            if let Some(ref mut child) = *handle {
+                match child.try_wait() {
+                    Ok(None) => "Connecting".to_string(),
+                    _ => "Disconnected".to_string(),
+                }
+            } else {
+                "Disconnected".to_string()
+            }
+        } else {
+            "Disconnected".to_string()
+        }
+    };
+    
+    Ok(VpnStatus {
+        enabled,
+        configured,
+        status,
+        config_path,
+        username,
+    })
+}
+
+#[tauri::command]
+fn save_vpn_config(
+    state: State<'_, AppState>,
+    config_content: String,
+    username: Option<String>,
+    password: Option<String>,
+    enabled: bool,
+) -> Result<DesktopStatus, String> {
+    let conn = state.connect().map_err(|error| error.to_string())?;
+    set_bool_setting(&conn, "vpn_enabled", enabled).map_err(|error| error.to_string())?;
+    
+    if let Some(user) = &username {
+        set_setting(&conn, "vpn_username", user).map_err(|error| error.to_string())?;
+    } else {
+        delete_setting(&conn, "vpn_username").map_err(|error| error.to_string())?;
+    }
+    if let Some(pass) = &password {
+        set_setting(&conn, "vpn_password", pass).map_err(|error| error.to_string())?;
+    } else {
+        delete_setting(&conn, "vpn_password").map_err(|error| error.to_string())?;
+    }
+    
+    if !config_content.trim().is_empty() {
+        let app_dir = app_data_dir().map_err(|error| error.to_string())?;
+        let config_path = app_dir.join("client.ovpn");
+        fs::write(&config_path, &config_content)
+            .map_err(|error| format!("Failed to write OpenVPN config file: {}", error))?;
+        set_setting(&conn, "vpn_config_path", &config_path.to_string_lossy())
+            .map_err(|error| error.to_string())?;
+        log_activity(&state, "info", &format!("OpenVPN configuration saved to {}", config_path.display()))
+            .map_err(|error| error.to_string())?;
+    } else if enabled {
+        let existing = get_setting(&conn, "vpn_config_path").map_err(|error| error.to_string())?;
+        if existing.is_none() {
+            return Err("Cannot enable OpenVPN require rule without a configuration file".to_string());
+        }
+    }
+    
+    log_activity(
+        &state,
+        "info",
+        &format!("OpenVPN enforcement rule set to {}", enabled),
+    )
+    .map_err(|error| error.to_string())?;
+    
+    current_status(&state).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn connect_vpn(state: State<'_, AppState>) -> Result<DesktopStatus, String> {
+    let conn = state.connect().map_err(|error| error.to_string())?;
+    let vpn_config_path = get_setting(&conn, "vpn_config_path").map_err(|error| error.to_string())?;
+    let Some(config_path_str) = vpn_config_path else {
+        return Err("No OpenVPN configuration file (.ovpn) is set".to_string());
+    };
+    let config_path = PathBuf::from(&config_path_str);
+    if !config_path.is_file() {
+        return Err(format!("OpenVPN configuration file not found at: {}", config_path_str));
+    }
+    let openvpn_bin = find_openvpn_binary().ok_or_else(|| "OpenVPN executable (openvpn.exe) not found on the system. Please install OpenVPN.".to_string())?;
+    
+    if let Ok(mut handle) = VPN_CHILD_PROCESS.lock() {
+        if let Some(mut child) = handle.take() {
+            let _ = child.kill();
+        }
+    }
+    
+    let mut args = vec!["--config".to_string(), config_path.to_string_lossy().to_string()];
+    let username = get_setting(&conn, "vpn_username").map_err(|error| error.to_string())?;
+    let password = get_setting(&conn, "vpn_password").map_err(|error| error.to_string())?;
+    
+    if let (Some(user), Some(pass)) = (username, password) {
+        if !user.trim().is_empty() && !pass.trim().is_empty() {
+            let app_dir = app_data_dir().map_err(|error| error.to_string())?;
+            let credentials_path = app_dir.join("vpn_credentials.tmp");
+            fs::write(&credentials_path, format!("{}\n{}", user.trim(), pass.trim()))
+                .map_err(|error| format!("Failed to write VPN credentials: {}", error))?;
+            args.push("--auth-user-pass".to_string());
+            args.push(credentials_path.to_string_lossy().to_string());
+        }
+    }
+    
+    log_activity(&state, "info", &format!("Spawning OpenVPN background process: {:?}", openvpn_bin))
+        .map_err(|error| error.to_string())?;
+        
+    let child = std::process::Command::new(openvpn_bin)
+        .args(args)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .map_err(|error| format!("Failed to start OpenVPN process: {}", error))?;
+        
+    if let Ok(mut handle) = VPN_CHILD_PROCESS.lock() {
+        *handle = Some(child);
+    }
+    
+    current_status(&state).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn disconnect_vpn(state: State<'_, AppState>) -> Result<DesktopStatus, String> {
+    if let Ok(mut handle) = VPN_CHILD_PROCESS.lock() {
+        if let Some(mut child) = handle.take() {
+            log_activity(&state, "info", "Terminating OpenVPN background process")
+                .map_err(|error| error.to_string())?;
+            let _ = child.kill();
+        }
+    }
+    if let Ok(app_dir) = app_data_dir() {
+        let credentials_path = app_dir.join("vpn_credentials.tmp");
+        if credentials_path.is_file() {
+            let _ = fs::remove_file(credentials_path);
+        }
+    }
+    current_status(&state).map_err(|error| error.to_string())
+}
+
 #[tauri::command]
 fn open_log_folder() -> Result<(), String> {
     let dir = logs_dir();
@@ -3257,7 +3498,11 @@ fn run_inner() -> Result<()> {
             set_peer_ip_override,
             set_peer_port,
             get_peer_devices,
-            trigger_raid_repair
+            trigger_raid_repair,
+            get_vpn_status,
+            save_vpn_config,
+            connect_vpn,
+            disconnect_vpn
         ])
         .setup(|app| {
             let state = app.state::<AppState>();
