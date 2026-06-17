@@ -128,6 +128,7 @@ function App() {
     config_path: string | null;
     username: string | null;
   } | null>(null);
+  const [activeTab, setActiveTab] = useState<"dashboard" | "folders" | "peers" | "vpn" | "logs" | "settings">("dashboard");
 
   useEffect(() => {
     void refreshStatus();
@@ -496,276 +497,326 @@ function App() {
   return (
     <main className="app-shell">
       <section className="sidebar">
-        <div className="brand">
-          <span className="brand-kicker">Torrent Shred Vault</span>
-          <h1>Desktop Client</h1>
-          <p>Windows vault sync, queue control, and software updates.</p>
-        </div>
-
         {!status?.authenticated ? (
-          <form className="panel form-panel" onSubmit={handleLogin}>
-            <div className="panel-header">
-              <h2>First Run Setup</h2>
-              <p>Connect this desktop to the Docker web app.</p>
+          <>
+            <div className="brand">
+              <span className="brand-kicker">Torrent Shred Vault</span>
+              <h1>Desktop Client</h1>
+              <p>Windows vault sync, queue control, and software updates.</p>
             </div>
-
-            <label>
-              <span>Server URL</span>
-              <input value={serverUrl} onChange={(event) => setServerUrl(event.target.value)} placeholder={defaultServer} />
-            </label>
-
-            <label>
-              <span>Admin or User Email</span>
-              <input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="mail@arifmahmud.com" />
-            </label>
-
-            <label>
-              <span>Vault Password</span>
-              <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
-            </label>
-
-            <label>
-              <span>Desktop Folder Base</span>
-              <input value={baseDir} onChange={(event) => setBaseDir(event.target.value)} placeholder="Documents\\Torrent Shred Vault" />
-            </label>
-
-            <label className="checkbox">
-              <input
-                type="checkbox"
-                checked={rememberPassword}
-                onChange={(event) => setRememberPassword(event.target.checked)}
-              />
-              <span>Store private vault password in Windows Credential Manager</span>
-            </label>
-
-            <button type="submit" className="primary" disabled={busy}>
-              {busy ? "Signing In..." : "Sign In and Bootstrap"}
-            </button>
-          </form>
-        ) : (
-          <section className="panel">
-            <div className="panel-header">
-              <h2>Session</h2>
-              <p>{status.user_email}</p>
-            </div>
-
-            <div className="stat-grid compact">
-              <div className="stat-card">
-                <span className="stat-label">Queue</span>
-                <strong>{status.queue_count}</strong>
+            <form className="panel form-panel" onSubmit={handleLogin}>
+              <div className="panel-header">
+                <h2>First Run Setup</h2>
+                <p>Connect this desktop to the Docker web app.</p>
               </div>
-              <div className="stat-card">
-                <span className="stat-label">Mode</span>
-                <strong className={isSyncLocked ? "text-warning" : ""}>
-                  {isSyncLocked ? "Locked" : status.sync_enabled ? "Running" : "Paused"}
-                </strong>
-              </div>
-            </div>
 
-            <div className="stack">
+              <label>
+                <span>Server URL</span>
+                <input value={serverUrl} onChange={(event) => setServerUrl(event.target.value)} placeholder={defaultServer} />
+              </label>
+
+              <label>
+                <span>Admin or User Email</span>
+                <input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="mail@arifmahmud.com" />
+              </label>
+
+              <label>
+                <span>Vault Password</span>
+                <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
+              </label>
+
+              <label>
+                <span>Desktop Folder Base</span>
+                <input value={baseDir} onChange={(event) => setBaseDir(event.target.value)} placeholder="Documents\\Torrent Shred Vault" />
+              </label>
+
               <label className="checkbox">
                 <input
                   type="checkbox"
-                  checked={status.startup_enabled}
-                  onChange={(event) => void handleSetStartup(event.target.checked)}
+                  checked={rememberPassword}
+                  onChange={(event) => setRememberPassword(event.target.checked)}
                 />
-                <span>Run on Windows startup</span>
+                <span>Store private vault password in Windows Credential Manager</span>
               </label>
-              <label>
-                <span>Server URL</span>
-                <input value={serverUrl} onChange={(event) => setServerUrl(event.target.value)} />
-              </label>
-              <button type="button" onClick={() => void handleSaveServerUrl()} disabled={busy}>
-                Save Server URL
+
+              <button type="submit" className="primary" disabled={busy}>
+                {busy ? "Signing In..." : "Sign In and Bootstrap"}
               </button>
-              <div className="button-row">
-                <button
-                  type="button"
-                  className={status.sync_mode === "two_way" ? "primary" : ""}
-                  onClick={() => void handleSetSyncMode("two_way")}
-                  disabled={busy}
-                >
-                  Two-Way Sync
-                </button>
-                <button
-                  type="button"
-                  className={status.sync_mode === "push_only" ? "primary" : ""}
-                  onClick={() => void handleSetSyncMode("push_only")}
-                  disabled={busy}
-                >
-                  Push Only
-                </button>
+            </form>
+          </>
+        ) : (
+          <>
+            <div className="brand">
+              <div className="brand-icon-wrapper">
+                <span className="synology-logo-dot" />
               </div>
-              <label>
-                <span>Bandwidth Limit KB/s</span>
-                <input
-                  type="number"
-                  min="0"
-                  value={bandwidthLimit}
-                  onChange={(event) => setBandwidthLimit(event.target.value)}
-                  placeholder="0"
-                />
-              </label>
-              <button type="button" onClick={() => void handleSaveBandwidthLimit()} disabled={busy}>
-                Save Bandwidth Limit
-              </button>
-              <button type="button" className="primary" onClick={() => void handleSyncNow()} disabled={busy || isSyncLocked}>
-                Sync Now
-              </button>
-              <button type="button" onClick={() => void handleToggleSync(!status.sync_enabled)} disabled={busy}>
-                {status.sync_enabled ? "Pause Sync" : "Resume Sync"}
-              </button>
-              <button type="button" onClick={() => void handleQuitApp()} disabled={busy}>
-                Quit App
-              </button>
-              <button type="button" onClick={() => void handleClearSession()} disabled={busy}>
-                Clear Session
-              </button>
-              <button type="button" onClick={() => void handleOpenLogs()} disabled={busy}>
-                Open Logs
-              </button>
-              <button type="button" onClick={() => void handleResetLocalSyncState()} disabled={busy}>
-                Reset Local Sync State
-              </button>
+              <div className="brand-text">
+                <h2>Torrent Shred</h2>
+                <p className="brand-subtext">Synology Sync Client</p>
+              </div>
             </div>
-            <p className="subtle-note">Closing the window keeps the sync engine running in the background.</p>
-          </section>
-        )}
 
-        {(needsUnlock || status?.authenticated) && (
-          <form className="panel form-panel" onSubmit={handleUnlock}>
-            <div className="panel-header">
-              <h2>Private Vault Unlock</h2>
-              <p>Required when secure storage is disabled or after credential reset.</p>
-            </div>
-            <label>
-              <span>Password</span>
-              <input
-                type="password"
-                value={unlockPassword}
-                onChange={(event) => setUnlockPassword(event.target.value)}
-                placeholder="Enter private vault password"
-              />
-            </label>
-            <button type="submit" disabled={busy || unlockPassword.length < 8}>
-              Unlock Vault
-            </button>
-          </form>
-        )}
+            <nav className="sidebar-nav">
+              <button
+                type="button"
+                className={`nav-item ${activeTab === "dashboard" ? "active" : ""}`}
+                onClick={() => setActiveTab("dashboard")}
+              >
+                <span className="nav-icon">📊</span>
+                <span>Overview</span>
+              </button>
+              <button
+                type="button"
+                className={`nav-item ${activeTab === "folders" ? "active" : ""}`}
+                onClick={() => setActiveTab("folders")}
+              >
+                <span className="nav-icon">📁</span>
+                <span>Sync Folders</span>
+              </button>
+              <button
+                type="button"
+                className={`nav-item ${activeTab === "peers" ? "active" : ""}`}
+                onClick={() => setActiveTab("peers")}
+              >
+                <span className="nav-icon">🌐</span>
+                <span>Swarm Peers</span>
+              </button>
+              <button
+                type="button"
+                className={`nav-item ${activeTab === "vpn" ? "active" : ""}`}
+                onClick={() => setActiveTab("vpn")}
+              >
+                <span className="nav-icon">🔒</span>
+                <span>OpenVPN Setup</span>
+              </button>
+              <button
+                type="button"
+                className={`nav-item ${activeTab === "logs" ? "active" : ""}`}
+                onClick={() => setActiveTab("logs")}
+              >
+                <span className="nav-icon">🗒️</span>
+                <span>Logs & Activity</span>
+              </button>
+              <button
+                type="button"
+                className={`nav-item ${activeTab === "settings" ? "active" : ""}`}
+                onClick={() => setActiveTab("settings")}
+              >
+                <span className="nav-icon">⚙️</span>
+                <span>Settings</span>
+              </button>
+            </nav>
 
-        <section className="panel">
-          <div className="panel-header">
-            <h2>Desktop Update</h2>
-            <p>GitHub release delivery for Windows installers.</p>
-          </div>
-          <div className="stack">
-            <button type="button" onClick={() => void handleUpdateCheck()} disabled={busy}>
-              Check for Updates
-            </button>
-            <button type="button" onClick={() => void handleUpdateDownload()} disabled={busy || !updateInfo?.has_update}>
-              Download Update
-            </button>
-          </div>
-          <dl className="meta-list">
-            <div>
-              <dt>Current</dt>
-              <dd>{updateInfo?.current_version ?? "0.1.0"}</dd>
+            <div className="sidebar-footer">
+              <div className="connection-status">
+                <span className={`status-dot ${
+                  isSyncLocked ? "warning" : status.sync_enabled ? "online" : "offline"
+                }`} />
+                <span>
+                  {isSyncLocked ? "Sync Locked" : status.sync_enabled ? "Sync Active" : "Sync Paused"}
+                </span>
+              </div>
+              <p className="user-email-badge">{status.user_email}</p>
             </div>
-            <div>
-              <dt>Latest</dt>
-              <dd>{updateInfo?.latest_version ?? "Unknown"}</dd>
-            </div>
-            <div>
-              <dt>Asset</dt>
-              <dd>{updateInfo?.asset_name ?? "Release page"}</dd>
-            </div>
-          </dl>
-        </section>
+          </>
+        )}
       </section>
 
-      <section className="workspace">
-        <header className="workspace-header">
-          <div>
-            <h2>Vault Operations</h2>
-            <p>{status?.server_url ?? defaultServer}</p>
-          </div>
-          {message ? <p className="message">{message}</p> : null}
-        </header>
-
-        {isSyncLocked && (
-          <div className="alert-banner warning">
-            <span className="alert-icon">⚠️</span>
-            <div className="alert-content">
-              <strong>Sync Locked:</strong> OpenVPN connection is required but disconnected. Connect to resume file syncing.
+      {status?.authenticated && (
+        <section className="workspace">
+          <header className="workspace-header">
+            <div>
+              <h2>
+                {activeTab === "dashboard" && "Overview"}
+                {activeTab === "folders" && "Sync Folders"}
+                {activeTab === "peers" && "Swarm Peers"}
+                {activeTab === "vpn" && "OpenVPN Security"}
+                {activeTab === "logs" && "Logs & Activity"}
+                {activeTab === "settings" && "Settings"}
+              </h2>
+              <p>{status?.server_url ?? defaultServer}</p>
             </div>
-          </div>
-        )}
+            {message ? <p className="message">{message}</p> : null}
+          </header>
 
-        <section className="stat-grid">
-          <div className="stat-card">
-            <span className="stat-label">Uploads</span>
-            <strong>{summary?.uploads ?? 0}</strong>
-          </div>
-          <div className="stat-card">
-            <span className="stat-label">Downloads</span>
-            <strong>{summary?.downloads ?? 0}</strong>
-          </div>
-          <div className="stat-card">
-            <span className="stat-label">Deletes</span>
-            <strong>{summary?.deletions ?? 0}</strong>
-          </div>
-          <div className="stat-card">
-            <span className="stat-label">Conflicts</span>
-            <strong>{summary?.conflicts ?? 0}</strong>
-          </div>
-          <div className="stat-card">
-            <span className="stat-label">Transport</span>
-            <strong>{status?.transport_mode === "peer" ? "Peer" : "Relay"}</strong>
-            <p>{status?.peer_endpoint ?? `Port ${status?.peer_port ?? 44888}`}</p>
-          </div>
-          <div className="stat-card">
-            <span className="stat-label">RAID Protected</span>
-            <strong>{status?.raid_protected_manifests ?? 0}</strong>
-            <p>{status?.raid_degraded_manifests ?? 0} degraded</p>
-          </div>
-        </section>
+          {isSyncLocked && activeTab !== "vpn" && (
+            <div className="alert-banner warning">
+              <span className="alert-icon">⚠️</span>
+              <div className="alert-content">
+                <strong>Sync Locked:</strong> OpenVPN connection is required but disconnected. Connect under the OpenVPN Setup tab to resume file syncing.
+              </div>
+            </div>
+          )}
 
-        <section className="panel">
-          <div className="panel-header">
-            <h2>Live Transfers</h2>
-            <p>Large file sync progress for uploads and downloads.</p>
-          </div>
-          <div className="list-shell">
-            {status?.transfers.length ? (
-              status.transfers.map((transfer) => (
-                <div key={transfer.id} className="transfer-card">
-                  <div className="transfer-top">
-                    <div>
-                      <strong>{transfer.direction.toUpperCase()} · {transfer.root_kind}</strong>
-                      <p>{transfer.relative_path}</p>
+          {activeTab === "dashboard" && (
+            <>
+              {needsUnlock && (
+                <form className="panel form-panel" onSubmit={handleUnlock}>
+                  <div className="panel-header">
+                    <h2>Private Vault Unlock Required</h2>
+                    <p>Provide your private vault password to unlock file transfers.</p>
+                  </div>
+                  <label>
+                    <span>Password</span>
+                    <input
+                      type="password"
+                      value={unlockPassword}
+                      onChange={(event) => setUnlockPassword(event.target.value)}
+                      placeholder="Enter private vault password"
+                    />
+                  </label>
+                  <button type="submit" disabled={busy || unlockPassword.length < 8}>
+                    Unlock Vault
+                  </button>
+                </form>
+              )}
+
+              <div className="dashboard-status-wrapper">
+                <div className="status-dome-container">
+                  <div className={`status-dome ${
+                    isSyncLocked ? "locked" : status.sync_enabled ? "running" : "paused"
+                  }`}>
+                    <div className="status-dome-inner">
+                      <span className="status-dome-icon">
+                        {isSyncLocked ? "🔒" : status.sync_enabled ? "🔄" : "⏸️"}
+                      </span>
+                      <h3>
+                        {isSyncLocked ? "Sync Locked" : status.sync_enabled ? "System Protected" : "Sync Paused"}
+                      </h3>
+                      <p>
+                        {isSyncLocked ? "OpenVPN Required" : status.sync_enabled ? "All folders up to date" : "Sync scheduler paused"}
+                      </p>
                     </div>
-                    <span>{Math.round(transfer.percent)}%</span>
                   </div>
-                  <div className="progress-bar">
-                    <div className="progress-fill" style={{ width: `${Math.max(4, transfer.percent)}%` }} />
-                  </div>
-                  <div className="transfer-meta">
-                    <span>{transfer.phase}</span>
-                    <span>{transfer.bytes_done} / {transfer.bytes_total || 0} bytes</span>
-                    <span>{transfer.status}</span>
-                  </div>
-                  {transfer.message ? <p>{transfer.message}</p> : null}
                 </div>
-              ))
-            ) : (
-              <p className="empty-state">No transfers yet.</p>
-            )}
-          </div>
-        </section>
 
-        {status?.authenticated && (
-          <section className="grid-two">
+                <div className="quick-actions-bar">
+                  <button
+                    type="button"
+                    className="primary"
+                    onClick={() => void handleSyncNow()}
+                    disabled={busy || isSyncLocked || needsUnlock}
+                  >
+                    Sync Now
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleToggleSync(!status.sync_enabled)}
+                    disabled={busy || needsUnlock}
+                  >
+                    {status.sync_enabled ? "Pause Sync" : "Resume Sync"}
+                  </button>
+                </div>
+              </div>
+
+              <section className="stat-grid">
+                <div className="stat-card">
+                  <span className="stat-label">Uploads Completed</span>
+                  <strong>{summary?.uploads ?? 0}</strong>
+                </div>
+                <div className="stat-card">
+                  <span className="stat-label">Downloads Completed</span>
+                  <strong>{summary?.downloads ?? 0}</strong>
+                </div>
+                <div className="stat-card">
+                  <span className="stat-label">Deletes Synced</span>
+                  <strong>{summary?.deletions ?? 0}</strong>
+                </div>
+                <div className="stat-card">
+                  <span className="stat-label">Pending Queue</span>
+                  <strong>{status.queue_count}</strong>
+                </div>
+              </section>
+
+              <section className="panel">
+                <div className="panel-header">
+                  <h2>Live Transfers</h2>
+                  <p>Large file sync progress for uploads and downloads.</p>
+                </div>
+                <div className="list-shell">
+                  {status.transfers.length ? (
+                    status.transfers.map((transfer) => (
+                      <div key={transfer.id} className="transfer-card">
+                        <div className="transfer-top">
+                          <div>
+                            <strong>{transfer.direction.toUpperCase()} · {transfer.root_kind}</strong>
+                            <p>{transfer.relative_path}</p>
+                          </div>
+                          <span>{Math.round(transfer.percent)}%</span>
+                        </div>
+                        <div className="progress-bar">
+                          <div className="progress-fill" style={{ width: `${Math.max(4, transfer.percent)}%` }} />
+                        </div>
+                        <div className="transfer-meta">
+                          <span>{transfer.phase}</span>
+                          <span>{transfer.bytes_done} / {transfer.bytes_total || 0} bytes</span>
+                          <span>{transfer.status}</span>
+                        </div>
+                        {transfer.message ? <p>{transfer.message}</p> : null}
+                      </div>
+                    ))
+                  ) : (
+                    <p className="empty-state">All sync operations complete. No active transfers.</p>
+                  )}
+                </div>
+              </section>
+            </>
+          )}
+
+          {activeTab === "folders" && (
             <div className="stack" style={{ gap: "1rem" }}>
+              <section className="grid-two">
+                <article className="panel drive-panel">
+                  <div className="panel-header">
+                    <h2>User Vault</h2>
+                    <p>Encrypted private drive for owner-only files.</p>
+                  </div>
+                  <div className="drive-path">{status.user_root ?? "Not configured"}</div>
+                </article>
+
+                <article className="panel drive-panel">
+                  <div className="panel-header">
+                    <h2>Share Folder</h2>
+                    <p>Shared drive visible to authenticated swarm members.</p>
+                  </div>
+                  <div className="drive-path">{status.share_root ?? "Not configured"}</div>
+                </article>
+              </section>
+
+              <section className="grid-two">
+                <article className="panel drive-panel">
+                  <div className="panel-header">
+                    <h2>Raid Reserve</h2>
+                    <p>Local disk reserve space utilized for hosting peer parity shards.</p>
+                  </div>
+                  <div className="drive-path">{status.reserve_root ?? "Not configured"}</div>
+                </article>
+
+                <article className="panel">
+                  <div className="panel-header">
+                    <h2>Reserve & Parity Health</h2>
+                    <p>Parity protection health score for private vault files.</p>
+                  </div>
+                  <div className="stat-grid compact">
+                    <div className="stat-card">
+                      <span className="stat-label">Hosted Shards</span>
+                      <strong>{status.raid_hosted_shards}</strong>
+                    </div>
+                    <div className="stat-card">
+                      <span className="stat-label">Pending Jobs</span>
+                      <strong>{status.raid_pending_jobs}</strong>
+                    </div>
+                  </div>
+                  <button type="button" className="primary" onClick={() => void handleRaidRepair()} disabled={busy}>
+                    Force Swarm RAID Rebalance
+                  </button>
+                </article>
+              </section>
+            </div>
+          )}
+
+          {activeTab === "peers" && (
+            <section className="grid-two">
               <article className="panel">
                 <div className="panel-header">
                   <h2>Connection Settings</h2>
@@ -803,230 +854,307 @@ function App() {
 
               <article className="panel">
                 <div className="panel-header">
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <h2>OpenVPN Configurator</h2>
-                    <span className={`status-badge vpn-badge ${
-                      vpnDetails?.status.toLowerCase() === "connected" ? "online" :
-                      vpnDetails?.status.toLowerCase() === "connecting" ? "warning-status" : "offline"
-                    }`}>
-                      {vpnDetails?.status ?? "Disconnected"}
-                    </span>
-                  </div>
-                  <p>Configure and manage the VPN connection required for secure sync routing.</p>
+                  <h2>Active Swarm Peers</h2>
+                  <p>Devices registered on the same user account.</p>
                 </div>
-                <div className="stack">
-                  <label>
-                    <span>OpenVPN Config File (.ovpn) Content</span>
-                    <textarea
-                      rows={6}
-                      value={vpnConfigText}
-                      onChange={(e) => setVpnConfigText(e.target.value)}
-                      placeholder="Paste your .ovpn configuration text here..."
-                      className="code-textarea"
-                    />
-                  </label>
-                  <div className="button-row">
-                    <label>
-                      <span>Username (Optional)</span>
-                      <input
-                        type="text"
-                        value={vpnUsername}
-                        onChange={(e) => setVpnUsername(e.target.value)}
-                        placeholder="vpn_user"
-                      />
-                    </label>
-                    <label>
-                      <span>Password (Optional)</span>
-                      <input
-                        type="password"
-                        value={vpnPassword}
-                        onChange={(e) => setVpnPassword(e.target.value)}
-                        placeholder="vpn_password"
-                      />
-                    </label>
-                  </div>
-                  <label className="checkbox">
-                    <input
-                      type="checkbox"
-                      checked={vpnRequire}
-                      onChange={(e) => setVpnRequire(e.target.checked)}
-                    />
-                    <span>Require OpenVPN connection for file syncing</span>
-                  </label>
-                  <div className="button-row">
-                    <button
-                      type="button"
-                      className="primary"
-                      onClick={() => void handleSaveVpnConfig()}
-                      disabled={busy}
-                    >
-                      Save Config
-                    </button>
-                    {vpnDetails?.configured ? (
-                      vpnDetails.status === "Connected" || vpnDetails.status === "Connecting" ? (
-                        <button
-                          type="button"
-                          className="danger-button"
-                          onClick={() => void handleDisconnectVpn()}
-                          disabled={busy}
-                        >
-                          Disconnect
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          className="success-button"
-                          onClick={() => void handleConnectVpn()}
-                          disabled={busy}
-                        >
-                          Connect
-                        </button>
-                      )
-                    ) : (
-                      <button type="button" disabled>
-                        Not Configured
-                      </button>
-                    )}
-                  </div>
+                <div className="list-shell swarm-list" style={{ maxHeight: "480px" }}>
+                  {peerDevices.length ? (
+                    peerDevices.map((device) => {
+                      const isSelf = device.deviceId === status.device_id;
+                      return (
+                        <div key={device.deviceId} className={`peer-card ${isSelf ? "self-peer" : ""}`}>
+                          <div className="peer-top">
+                            <div>
+                              <strong>
+                                {device.deviceName} {isSelf && <span className="self-badge">(You)</span>}
+                              </strong>
+                              <p className="device-id">{device.deviceId}</p>
+                            </div>
+                            <span className={`status-badge ${device.isOnline ? "online" : "offline"}`}>
+                              {device.isOnline ? "Online" : "Offline"}
+                            </span>
+                          </div>
+                          <div className="peer-meta">
+                            <span>IP Endpoint: {device.peerEndpointUrl ?? "No IP registered"}</span>
+                            <span>Platform: {device.platform}</span>
+                            <span>Transport: {device.peerTransport}</span>
+                            <span>Capacity: {Math.round(device.reserveCapacityBytes / (1024 * 1024 * 1024))} GB ({device.reserveEnabled ? "On" : "Off"})</span>
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <p className="empty-state">No other peers detected in this swarm.</p>
+                  )}
                 </div>
               </article>
-            </div>
+            </section>
+          )}
 
+          {activeTab === "vpn" && (
             <article className="panel">
               <div className="panel-header">
-                <h2>Active Swarm Peers</h2>
-                <p>Devices registered on the same user account.</p>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <h2>OpenVPN Client Setup</h2>
+                  <span className={`status-badge vpn-badge ${
+                    vpnDetails?.status.toLowerCase() === "connected" ? "online" :
+                    vpnDetails?.status.toLowerCase() === "connecting" ? "warning-status" : "offline"
+                  }`}>
+                    {vpnDetails?.status ?? "Disconnected"}
+                  </span>
+                </div>
+                <p>Configure and spawn a secure OpenVPN connection for encrypted file transfers.</p>
               </div>
-              <div className="list-shell swarm-list" style={{ maxHeight: "680px" }}>
-                {peerDevices.length ? (
-                  peerDevices.map((device) => {
-                    const isSelf = device.deviceId === status.device_id;
-                    return (
-                      <div key={device.deviceId} className={`peer-card ${isSelf ? "self-peer" : ""}`}>
-                        <div className="peer-top">
-                          <div>
-                            <strong>
-                              {device.deviceName} {isSelf && <span className="self-badge">(You)</span>}
-                            </strong>
-                            <p className="device-id">{device.deviceId}</p>
-                          </div>
-                          <span className={`status-badge ${device.isOnline ? "online" : "offline"}`}>
-                            {device.isOnline ? "Online" : "Offline"}
-                          </span>
-                        </div>
-                        <div className="peer-meta">
-                          <span>IP Endpoint: {device.peerEndpointUrl ?? "No IP registered"}</span>
-                          <span>Platform: {device.platform}</span>
-                          <span>Transport: {device.peerTransport}</span>
-                          <span>Reserve Capacity: {Math.round(device.reserveCapacityBytes / (1024 * 1024 * 1024))} GB ({device.reserveEnabled ? "Enabled" : "Disabled"})</span>
-                        </div>
-                      </div>
-                    );
-                  })
-                ) : (
-                  <p className="empty-state">No peers found in swarm.</p>
-                )}
+              <div className="stack">
+                <label>
+                  <span>OpenVPN Config File (.ovpn) Content</span>
+                  <textarea
+                    rows={8}
+                    value={vpnConfigText}
+                    onChange={(e) => setVpnConfigText(e.target.value)}
+                    placeholder="Paste configuration (.ovpn) text here..."
+                    className="code-textarea"
+                  />
+                </label>
+                <div className="button-row">
+                  <label>
+                    <span>Username (Optional)</span>
+                    <input
+                      type="text"
+                      value={vpnUsername}
+                      onChange={(e) => setVpnUsername(e.target.value)}
+                      placeholder="vpn_username"
+                    />
+                  </label>
+                  <label>
+                    <span>Password (Optional)</span>
+                    <input
+                      type="password"
+                      value={vpnPassword}
+                      onChange={(e) => setVpnPassword(e.target.value)}
+                      placeholder="vpn_password"
+                    />
+                  </label>
+                </div>
+                <label className="checkbox">
+                  <input
+                    type="checkbox"
+                    checked={vpnRequire}
+                    onChange={(e) => setVpnRequire(e.target.checked)}
+                  />
+                  <span>Enforce secure OpenVPN tunnel for sync/seeding cycles</span>
+                </label>
+                <div className="button-row">
+                  <button
+                    type="button"
+                    className="primary"
+                    onClick={() => void handleSaveVpnConfig()}
+                    disabled={busy}
+                  >
+                    Save Config
+                  </button>
+                  {vpnDetails?.configured ? (
+                    vpnDetails.status === "Connected" || vpnDetails.status === "Connecting" ? (
+                      <button
+                        type="button"
+                        className="danger-button"
+                        onClick={() => void handleDisconnectVpn()}
+                        disabled={busy}
+                      >
+                        Disconnect VPN
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="success-button"
+                        onClick={() => void handleConnectVpn()}
+                        disabled={busy}
+                      >
+                        Connect VPN
+                      </button>
+                    )
+                  ) : (
+                    <button type="button" disabled>
+                      Not Configured
+                    </button>
+                  )}
+                </div>
               </div>
             </article>
-          </section>
-        )}
+          )}
 
-        <section className="grid-two">
-          <article className="panel drive-panel">
-            <div className="panel-header">
-              <h2>User Vault</h2>
-              <p>Encrypted private drive for owner-only files.</p>
-            </div>
-            <div className="drive-path">{status?.user_root ?? "Not configured yet"}</div>
-          </article>
-
-          <article className="panel drive-panel">
-            <div className="panel-header">
-              <h2>Share Folder</h2>
-              <p>Authenticated shared drive visible to logged-in users.</p>
-            </div>
-            <div className="drive-path">{status?.share_root ?? "Not configured yet"}</div>
-          </article>
-        </section>
-
-        <section className="grid-two">
-          <article className="panel drive-panel">
-            <div className="panel-header">
-              <h2>Raid Reserve</h2>
-              <p>Local reserve path used for parity shard hosting.</p>
-            </div>
-            <div className="drive-path">{status?.reserve_root ?? "Not configured yet"}</div>
-          </article>
-
-          <article className="panel">
-            <div className="panel-header">
-              <h2>Reserve Health</h2>
-              <p>Protection and pending repair state for private vault files.</p>
-            </div>
-            <div className="stat-grid compact">
-              <div className="stat-card">
-                <span className="stat-label">Hosted Shards</span>
-                <strong>{status?.raid_hosted_shards ?? 0}</strong>
-              </div>
-              <div className="stat-card">
-                <span className="stat-label">Pending Jobs</span>
-                <strong>{status?.raid_pending_jobs ?? 0}</strong>
-              </div>
-            </div>
-            <button type="button" className="primary" onClick={() => void handleRaidRepair()} disabled={busy}>
-              Trigger RAID Repair & Rebalance
-            </button>
-            <p className="subtle-note">Two reserve shards on different peers are required for healthy private-vault protection.</p>
-          </article>
-        </section>
-
-        <section className="grid-two">
-          <article className="panel">
-            <div className="panel-header">
-              <h2>Recent Activity</h2>
-              <p>Watcher, queue, and sync cycle events.</p>
-            </div>
-            <div className="list-shell">
-              {status?.recent_activity.length ? (
-                status.recent_activity.map((entry) => (
-                  <div key={entry.id} className="list-row">
-                    <div>
-                      <strong>{entry.level.toUpperCase()}</strong>
-                      <p>{entry.message}</p>
-                    </div>
-                    <time>{entry.created_at}</time>
+          {activeTab === "logs" && (
+            <section className="grid-two">
+              <article className="panel">
+                <div className="panel-header" style={{ display: "flex", flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <h2>System Activity Log</h2>
+                    <p>Recent sync engine and directory watcher events.</p>
                   </div>
-                ))
-              ) : (
-                <p className="empty-state">No desktop activity yet.</p>
-              )}
-            </div>
-          </article>
+                  <button type="button" onClick={() => void handleOpenLogs()} disabled={busy}>
+                    Open Logs Folder
+                  </button>
+                </div>
+                <div className="list-shell" style={{ maxHeight: "550px", overflowY: "auto" }}>
+                  {status.recent_activity.length ? (
+                    status.recent_activity.map((entry) => (
+                      <div key={entry.id} className="list-row">
+                        <div>
+                          <strong>{entry.level.toUpperCase()}</strong>
+                          <p>{entry.message}</p>
+                        </div>
+                        <time>{entry.created_at}</time>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="empty-state">No recent activity logged.</p>
+                  )}
+                </div>
+              </article>
 
-          <article className="panel">
-            <div className="panel-header">
-              <h2>Conflicts</h2>
-              <p>Remote wins are preserved as local conflict copies.</p>
-            </div>
-            <div className="list-shell">
-              {status?.conflicts.length ? (
-                status.conflicts.map((entry) => (
-                  <div key={entry.id} className="list-row">
-                    <div>
-                      <strong>{entry.root_kind}</strong>
-                      <p>{entry.relative_path}</p>
-                      <p>{entry.message}</p>
-                    </div>
-                    <time>{entry.created_at}</time>
+              <article className="panel">
+                <div className="panel-header" style={{ display: "flex", flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <h2>Conflict Resolution</h2>
+                    <p>Conflicts resolved by retaining remote changes as copy wins.</p>
                   </div>
-                ))
-              ) : (
-                <p className="empty-state">No conflict records.</p>
-              )}
+                  <button type="button" className="danger-button" onClick={() => void handleResetLocalSyncState()} disabled={busy}>
+                    Reset Sync State
+                  </button>
+                </div>
+                <div className="list-shell" style={{ maxHeight: "550px", overflowY: "auto" }}>
+                  {status.conflicts.length ? (
+                    status.conflicts.map((entry) => (
+                      <div key={entry.id} className="list-row">
+                        <div>
+                          <strong>{entry.root_kind}</strong>
+                          <p>{entry.relative_path}</p>
+                          <p>{entry.message}</p>
+                        </div>
+                        <time>{entry.created_at}</time>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="empty-state">No conflicts recorded.</p>
+                  )}
+                </div>
+              </article>
+            </section>
+          )}
+
+          {activeTab === "settings" && (
+            <div className="stack" style={{ gap: "1rem" }}>
+              <section className="grid-two">
+                <article className="panel">
+                  <div className="panel-header">
+                    <h2>Sync Service & Startup</h2>
+                    <p>Configure general desktop client settings.</p>
+                  </div>
+                  <div className="stack" style={{ gap: "1rem" }}>
+                    <label className="checkbox">
+                      <input
+                        type="checkbox"
+                        checked={status.startup_enabled}
+                        onChange={(event) => void handleSetStartup(event.target.checked)}
+                      />
+                      <span>Run Torrent Shred Vault Client on Windows Startup</span>
+                    </label>
+
+                    <div className="button-row">
+                      <button
+                        type="button"
+                        className={status.sync_mode === "two_way" ? "primary" : ""}
+                        onClick={() => void handleSetSyncMode("two_way")}
+                        disabled={busy}
+                      >
+                        Two-Way Sync Mode
+                      </button>
+                      <button
+                        type="button"
+                        className={status.sync_mode === "push_only" ? "primary" : ""}
+                        onClick={() => void handleSetSyncMode("push_only")}
+                        disabled={busy}
+                      >
+                        Push Only Mode
+                      </button>
+                    </div>
+
+                    <label>
+                      <span>Bandwidth Rate Limiter (KB/s)</span>
+                      <input
+                        type="number"
+                        min="0"
+                        value={bandwidthLimit}
+                        onChange={(event) => setBandwidthLimit(event.target.value)}
+                        placeholder="0 (Unlimited)"
+                      />
+                    </label>
+                    <button type="button" onClick={() => void handleSaveBandwidthLimit()} disabled={busy}>
+                      Apply Bandwidth Limit
+                    </button>
+                  </div>
+                </article>
+
+                <article className="panel">
+                  <div className="panel-header">
+                    <h2>Docker Server Connection</h2>
+                    <p>Host url mapping for authentication and sync metadata server.</p>
+                  </div>
+                  <div className="stack" style={{ gap: "1rem" }}>
+                    <label>
+                      <span>Central API Server URL</span>
+                      <input value={serverUrl} onChange={(event) => setServerUrl(event.target.value)} />
+                    </label>
+                    <button type="button" className="primary" onClick={() => void handleSaveServerUrl()} disabled={busy}>
+                      Save Server URL
+                    </button>
+                    
+                    <div className="button-row">
+                      <button type="button" className="danger-button" onClick={() => void handleClearSession()} disabled={busy}>
+                        Clear Device Session
+                      </button>
+                      <button type="button" className="danger-button" onClick={() => void handleQuitApp()} disabled={busy}>
+                        Exit Application
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              </section>
+
+              <section className="panel">
+                <div className="panel-header">
+                  <h2>Software Updates & Support</h2>
+                  <p>Check for desktop client update installer downloads.</p>
+                </div>
+                <div className="grid-two">
+                  <div className="stack" style={{ gap: "0.5rem" }}>
+                    <button type="button" className="primary" onClick={() => void handleUpdateCheck()} disabled={busy}>
+                      Check for Updates
+                  </button>
+                    <button type="button" onClick={() => void handleUpdateDownload()} disabled={busy || !updateInfo?.has_update}>
+                      Download Available Update
+                  </button>
+                  </div>
+                  <dl className="meta-list" style={{ marginTop: 0 }}>
+                    <div>
+                      <dt>Current Version</dt>
+                      <dd>{updateInfo?.current_version ?? "0.1.0"}</dd>
+                    </div>
+                    <div>
+                      <dt>Latest Release</dt>
+                      <dd>{updateInfo?.latest_version ?? "Unknown"}</dd>
+                    </div>
+                    <div>
+                      <dt>Asset Installer</dt>
+                      <dd style={{ fontSize: "0.82rem" }}>{updateInfo?.asset_name ?? "None available"}</dd>
+                    </div>
+                  </dl>
+                </div>
+              </section>
             </div>
-          </article>
+          )}
         </section>
-      </section>
+      )}
     </main>
   );
 }
