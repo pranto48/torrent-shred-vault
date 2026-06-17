@@ -1469,6 +1469,29 @@ fn hash_bytes(bytes: &[u8]) -> String {
     format!("{:x}", hasher.finalize())
 }
 
+fn crypt_bytes_with_password(bytes: &[u8], password: &str) -> Vec<u8> {
+    if password.is_empty() {
+        return bytes.to_vec();
+    }
+    let mut key_hasher = Sha256::new();
+    key_hasher.update(password.as_bytes());
+    let key = key_hasher.finalize();
+
+    let mut output = vec![0_u8; bytes.len()];
+    let chunk_size = 32;
+    for (chunk_idx, chunk) in bytes.chunks(chunk_size).enumerate() {
+        let mut hasher = Sha256::new();
+        hasher.update(&key);
+        hasher.update(&(chunk_idx as u64).to_le_bytes());
+        let keystream_block = hasher.finalize();
+
+        for (byte_idx, byte) in chunk.iter().enumerate() {
+            output[chunk_idx * chunk_size + byte_idx] = byte ^ keystream_block[byte_idx];
+        }
+    }
+    output
+}
+
 fn build_raid_shard_bytes(file_bytes: &[u8]) -> (i64, Vec<Vec<u8>>, Vec<RaidUploadShard>) {
     let shard_len = file_bytes.len().div_ceil(DEFAULT_RAID_DATA_SHARDS).max(1);
     let mut shard0 = vec![0_u8; shard_len];
@@ -1723,6 +1746,7 @@ fn reconstruct_file_from_raid(
     config: &RuntimeConfig,
     change: &SyncChange,
     root_kind: &str,
+    password: Option<&str>,
     target_path: &Path,
 ) -> Result<bool> {
     let Some(raid) = &change.raid else {
@@ -1759,11 +1783,13 @@ fn reconstruct_file_from_raid(
     let mut merged = data0;
     merged.extend_from_slice(&data1);
     merged.truncate(raid.size_bytes.max(0) as usize);
+    let pw = password.unwrap_or("");
+    let decrypted = crypt_bytes_with_password(&merged, pw);
     if let Some(parent) = target_path.parent() {
         fs::create_dir_all(parent)?;
     }
     upsert_transfer_progress(state, root_kind, &change.path, "download", "reconstructing", "active", raid.size_bytes, 0, None)?;
-    fs::write(target_path, &merged).with_context(|| format!("failed to write {}", target_path.display()))?;
+    fs::write(target_path, &decrypted).with_context(|| format!("failed to write {}", target_path.display()))?;
     upsert_transfer_progress(state, root_kind, &change.path, "download", "completed", "completed", raid.size_bytes, raid.size_bytes, None)?;
     if let Some(hash) = change.sha256.as_deref() {
         let pieces = build_piece_manifest(target_path).unwrap_or_default();
@@ -2194,7 +2220,7 @@ fn download_remote_file(
     if config.transport_mode == "peer" && download_from_peer_source(state, config, change, root_kind, target_path)? {
         return Ok(());
     }
-    if config.transport_mode == "peer" && reconstruct_file_from_raid(state, config, change, root_kind, target_path)? {
+    if config.transport_mode == "peer" && reconstruct_file_from_raid(state, config, change, root_kind, password, target_path)? {
         return Ok(());
     }
     let Some(file_id) = &change.file_id else {
@@ -2468,7 +2494,9 @@ fn process_queue(state: &AppState, config: &RuntimeConfig, password: Option<&str
                             let payload: SyncFileRegisterResponse = decode_json(response)?;
                             if config.raid_enabled && item.root_kind == "user_vault" {
                                 let file_bytes = fs::read(&full_path).with_context(|| format!("failed to read {}", full_path.display()))?;
-                                let (shard_bytes, _shard_payloads, shards) = build_raid_shard_bytes(&file_bytes);
+                                let pw = password.unwrap_or("");
+                                let encrypted_bytes = crypt_bytes_with_password(&file_bytes, pw);
+                                let (shard_bytes, _shard_payloads, shards) = build_raid_shard_bytes(&encrypted_bytes);
                                 let raid_response = client
                                     .post(format!("{}/api/sync/raid/register", config.server_url))
                                     .bearer_auth(&config.token)
@@ -2836,7 +2864,9 @@ fn handle_peer_client(state: AppState, mut stream: TcpStream) -> Result<()> {
                     return Ok(());
                 }
                 let file_bytes = fs::read(&file_path).with_context(|| format!("failed to read {}", file_path.display()))?;
-                let (_, shard_payloads, _) = build_raid_shard_bytes(&file_bytes);
+                let password = load_private_password(&state, &config)?.unwrap_or_default();
+                let encrypted_bytes = crypt_bytes_with_password(&file_bytes, &password);
+                let (_, shard_payloads, _) = build_raid_shard_bytes(&encrypted_bytes);
                 let shard_index = validated.ticket.shard_index.unwrap_or(0).max(0) as usize;
                 shard_payloads.get(shard_index).cloned().ok_or_else(|| anyhow!("RAID shard index out of range"))?
             }
